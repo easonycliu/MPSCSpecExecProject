@@ -1,20 +1,25 @@
 [submodule "mage"]
 	path = mage
 	url = git@github.com:easonycliu/MPSCSpecExecMAGE.git
+	branch = osprey
 
 [submodule "oblivious-SEAL"]
 	path = oblivious-SEAL
 	url = git@github.com:easonycliu/MPSCSpecExecSEAL.git
+	branch = osprey
 
 [submodule "osprey"]
 	path = osprey
 	url = git@github.com:easonycliu/MPSCSpecExecOsprey.git
+	branch = osprey
 
 [submodule "tfhe"]
 	path = tfhe
 	url = git@github.com:easonycliu/MPSCSpecExecTFHE.git
+	branch = osprey
 
 [submodule "yaml-cpp"]
 	path = yaml-cpp
 	url = git@github.com:easonycliu/MPSCSpecExecYAMLCpp.git
+	branch = osprey
 

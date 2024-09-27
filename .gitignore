@@ -4,3 +4,6 @@ mage-ucbrise
 SEAL
 
 *.img
+
+/build
+/install

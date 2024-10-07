@@ -1,4 +1,4 @@
-PROJECT_DIR = /home/ubuntu/MPSCSpecExecProject
+PROJECT_DIR = $(shell pwd)
 DEP_INSTALL_DIR = $(PROJECT_DIR)/install
 DEP_BUILD_DIR = $(PROJECT_DIR)/build
 
@@ -7,7 +7,7 @@ all: $(DEP_INSTALL_DIR)/yaml-cpp $(DEP_INSTALL_DIR)/tfhe $(DEP_INSTALL_DIR)/obli
 		make clean && \
 		make
 
-$(DEP_INSTALL_DIR)/yaml-cpp: $(DEP_INSTALL_DIR) install_deps
+$(DEP_INSTALL_DIR)/yaml-cpp: $(DEP_INSTALL_DIR)
 	mkdir $@
 	mkdir $(DEP_BUILD_DIR)/yaml-cpp
 	cd $(PROJECT_DIR)/yaml-cpp && \
@@ -15,7 +15,7 @@ $(DEP_INSTALL_DIR)/yaml-cpp: $(DEP_INSTALL_DIR) install_deps
 		cmake --build $(DEP_BUILD_DIR)/yaml-cpp && \
 		cmake --install $(DEP_BUILD_DIR)/yaml-cpp
 
-$(DEP_INSTALL_DIR)/tfhe: $(DEP_INSTALL_DIR) install_deps
+$(DEP_INSTALL_DIR)/tfhe: $(DEP_INSTALL_DIR)
 	mkdir $@
 	mkdir $(DEP_BUILD_DIR)/tfhe
 	cd $(PROJECT_DIR)/tfhe && \
@@ -23,7 +23,7 @@ $(DEP_INSTALL_DIR)/tfhe: $(DEP_INSTALL_DIR) install_deps
 		cmake --build $(DEP_BUILD_DIR)/tfhe && \
 		cmake --install $(DEP_BUILD_DIR)/tfhe
 
-$(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) install_deps $(DEP_INSTALL_DIR)/osprey
+$(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_INSTALL_DIR)/osprey
 	mkdir $@
 	mkdir $(DEP_BUILD_DIR)/oblivious-SEAL
 	cd $(PROJECT_DIR)/oblivious-SEAL && \
@@ -31,7 +31,7 @@ $(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) install_deps $(DEP_INSTALL
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
-$(DEP_INSTALL_DIR)/osprey: $(DEP_INSTALL_DIR) install_deps
+$(DEP_INSTALL_DIR)/osprey: $(DEP_INSTALL_DIR)
 	cd $(PROJECT_DIR)/osprey && make clean && make
 
 $(DEP_INSTALL_DIR): $(DEP_BUILD_DIR)

@@ -4,8 +4,8 @@ DEP_BUILD_DIR = $(PROJECT_DIR)/build
 
 all: $(DEP_INSTALL_DIR)/yaml-cpp $(DEP_INSTALL_DIR)/tfhe $(DEP_INSTALL_DIR)/oblivious-SEAL $(DEP_INSTALL_DIR)/osprey
 	cd $(PROJECT_DIR)/mage && \
-		make clean && \
-		make
+		make clean PROJECT_DIR=$(PROJECT_DIR) && \
+		make PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/yaml-cpp: $(DEP_INSTALL_DIR)
 	mkdir $@
@@ -27,7 +27,7 @@ $(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_INSTALL_DIR)/osprey
 	mkdir $@
 	mkdir $(DEP_BUILD_DIR)/oblivious-SEAL
 	cd $(PROJECT_DIR)/oblivious-SEAL && \
-		cmake -B $(DEP_BUILD_DIR)/oblivious-SEAL -DSEAL_USE_ZLIB=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$@ && \
+		cmake -B $(DEP_BUILD_DIR)/oblivious-SEAL -DSEAL_USE_ZLIB=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
@@ -46,6 +46,6 @@ install_deps:
 
 clean:
 	cd $(PROJECT_DIR)/osprey && make clean
-	cd $(PROJECT_DIR)/mage && make clean
+	cd $(PROJECT_DIR)/mage && make clean PROJECT_DIR=$(PROJECT_DIR)
 	cd $(PROJECT_DIR) && rm -rf $(DEP_BUILD_DIR) && rm -rf $(DEP_INSTALL_DIR)
 

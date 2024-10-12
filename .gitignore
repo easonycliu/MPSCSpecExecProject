@@ -1,6 +1,7 @@
 .bash_history
 .cmake
 mage-ucbrise
+mage-scripts
 SEAL
 
 *.img

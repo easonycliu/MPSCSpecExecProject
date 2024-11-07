@@ -13,3 +13,6 @@
 [submodule "yaml-cpp"]
 	path = yaml-cpp
 	url = git@github.com:easonycliu/MPSCSpecExecYAMLCpp.git
+[submodule "linux"]
+	path = linux
+	url = git@github.com:easonycliu/MPSCSpecExecLinux.git

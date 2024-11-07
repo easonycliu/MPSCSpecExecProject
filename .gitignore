@@ -3,9 +3,9 @@
 mage-ucbrise
 mage-scripts
 SEAL
-linux
 FlameGraph
 tmp
+microbenchmark
 
 *.img
 

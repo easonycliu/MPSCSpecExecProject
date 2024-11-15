@@ -1,0 +1,16 @@
+#!/bin/bash
+
+project_dir=$(realpath .)
+bin_dir=$project_dir/mage/bin
+root_dir=$bin_dir/rootfs
+
+pushd $bin_dir
+dd if=/dev/zero of=rootfs.ext3 bs=4096 count=2099952
+mkfs.ext3 rootfs.ext3
+rand=$RANDOM
+mkdir -p $bin_dir/$rand
+sudo mount -o loop rootfs.ext3 $bin_dir/$rand
+sudo cp -d -r $root_dir/* $bin_dir/$rand
+sudo umount $bin_dir/$rand
+rm -rf $bin_dir/$rand
+popd

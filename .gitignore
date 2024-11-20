@@ -6,6 +6,7 @@ SEAL
 FlameGraph
 tmp
 microbenchmark
+perf-tools
 
 *.img
 

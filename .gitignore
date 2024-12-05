@@ -9,6 +9,11 @@ microbenchmark
 perf-tools
 
 *.img
+*.png
 
 /build
 /install
+/grublist
+/pyenv
+
+/grublist.tar.gz

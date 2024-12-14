@@ -7,13 +7,14 @@ FlameGraph
 tmp
 microbenchmark
 perf-tools
+__pycache__
 
 *.img
 *.png
+*.pyc
 
 /build
 /install
-/grublist
 /pyenv
 
 /grublist.tar.gz

@@ -37,13 +37,13 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
-$(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/oblivious-SEAL osprey
+$(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/oblivious-SEAL $(PROJECT_DIR)/osprey/bin/libosprey.so
 	mkdir $@ || true
 
 $(DEP_BUILD_DIR)/oblivious-SEAL: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-osprey: $(DEP_INSTALL_DIR)
+$(PROJECT_DIR)/osprey/bin/libosprey.so: $(DEP_INSTALL_DIR)
 	cd $(PROJECT_DIR)/osprey && make clean && make
 
 $(DEP_INSTALL_DIR): $(DEP_BUILD_DIR)
@@ -53,7 +53,7 @@ $(DEP_BUILD_DIR):
 	mkdir $@ || true
 
 install_deps:
-	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev
+	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev cgroup-tools
 	cd $(PROJECT_DIR)/osprey && ./install_deps.sh --install-osprey-deps
 
 clean:

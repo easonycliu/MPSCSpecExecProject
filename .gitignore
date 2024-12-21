@@ -12,6 +12,7 @@ __pycache__
 *.img
 *.png
 *.pyc
+*.log
 
 /build
 /install

@@ -13,6 +13,7 @@ __pycache__
 *.png
 *.pyc
 *.log
+*.trace
 
 /build
 /install

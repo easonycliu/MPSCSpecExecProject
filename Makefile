@@ -2,7 +2,9 @@ PROJECT_DIR = $(shell pwd)
 DEP_INSTALL_DIR = $(PROJECT_DIR)/install
 DEP_BUILD_DIR = $(PROJECT_DIR)/build
 
-all: yaml-cpp tfhe oblivious-SEAL osprey
+.PHONY: all clean install_deps yaml-cpp tfhe oblivious-SEAL osprey emp-tool emp-ot emp-sh2pc
+
+all: yaml-cpp tfhe oblivious-SEAL osprey SEAL
 	cd $(PROJECT_DIR)/mage && \
 		make clean PROJECT_DIR=$(PROJECT_DIR) && \
 		make PROJECT_DIR=$(PROJECT_DIR)
@@ -37,6 +39,36 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
+emp-tool: $(DEP_INSTALL_DIR)/emp-tool
+	cd $(PROJECT_DIR)/emp-tool && \
+		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ && \
+		cmake --build $(DEP_BUILD_DIR)/emp-tool && \
+		cmake --install $(DEP_BUILD_DIR)/emp-tool
+
+$(DEP_INSTALL_DIR)/emp-tool: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-tool
+	mkdir $@ || true
+
+$(DEP_BUILD_DIR)/emp-tool: $(DEP_BUILD_DIR)
+	mkdir $@ || true
+
+emp-ot: $(DEP_INSTALL_DIR)/emp-ot $(DEP_INSTALL_DIR)/emp-tool
+	cd $(PROJECT_DIR)/emp-ot && \
+		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH=$(DEP_INSTALL_DIR)/emp-tool && \
+		cmake --build $(DEP_BUILD_DIR)/emp-ot && \
+		cmake --install $(DEP_BUILD_DIR)/emp-ot
+
+$(DEP_INSTALL_DIR)/emp-ot: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-ot
+	mkdir $@ || true
+
+$(DEP_BUILD_DIR)/emp-ot: $(DEP_BUILD_DIR)
+	mkdir $@ || true
+
+emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc $(DEP_INSTALL_DIR)/emp-tool $(DEP_INSTALL_DIR)/emp-ot
+	cd $(PROJECT_DIR)/emp-sh2pc && \
+		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" && \
+		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc && \
+		cmake --install $(DEP_BUILD_DIR)/emp-sh2pc
+
 $(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/oblivious-SEAL $(PROJECT_DIR)/osprey/bin/libosprey.so
 	mkdir $@ || true
 
@@ -44,7 +76,7 @@ $(DEP_BUILD_DIR)/oblivious-SEAL: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
 $(PROJECT_DIR)/osprey/bin/libosprey.so: $(DEP_INSTALL_DIR)
-	cd $(PROJECT_DIR)/osprey && make clean && make
+	cd $(PROJECT_DIR)/osprey && make clean PROJECT_DIR=$(PROJECT_DIR) && make PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR): $(DEP_BUILD_DIR)
 	mkdir $@ || true
@@ -57,7 +89,7 @@ install_deps:
 	cd $(PROJECT_DIR)/osprey && ./install_deps.sh --install-osprey-deps
 
 clean:
-	cd $(PROJECT_DIR)/osprey && make clean
+	cd $(PROJECT_DIR)/osprey && make clean PROJECT_DIR=$(PROJECT_DIR)
 	cd $(PROJECT_DIR)/mage && make clean PROJECT_DIR=$(PROJECT_DIR)
 	cd $(PROJECT_DIR) && rm -rf $(DEP_BUILD_DIR) && rm -rf $(DEP_INSTALL_DIR)
 

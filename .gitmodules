@@ -16,3 +16,12 @@
 [submodule "linux"]
 	path = linux
 	url = git@github.com:easonycliu/MPSCSpecExecLinux.git
+[submodule "emp-tool"]
+	path = emp-tool
+	url = git@github.com:easonycliu/MPSCSpecExecEMPTool.github
+[submodule "emp-ot"]
+	path = emp-ot
+	url = git@github.com:easonycliu/MPSCSpecExecEMPOT.git
+[submodule "emp-sh2pc"]
+	path = emp-sh2pc
+	url = git@github.com:easonycliu/MPSCSpecExecEMPSh2PC.git

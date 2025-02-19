@@ -2,12 +2,52 @@ PROJECT_DIR = $(shell pwd)
 DEP_INSTALL_DIR = $(PROJECT_DIR)/install
 DEP_BUILD_DIR = $(PROJECT_DIR)/build
 
-.PHONY: all clean install_deps yaml-cpp tfhe oblivious-SEAL osprey emp-tool emp-ot emp-sh2pc
+TOOLS_SOURCE = $(wildcard $(PROJECT_DIR)/tools/*.cpp)
+TOOLS_OBJECTS = $(addprefix $(DEP_BUILD_DIR)/tools/,$(foreach file,$(TOOLS_SOURCE),$(notdir $(basename $(file))).o))
+TOOLS_EXECUTABLES = $(addprefix $(DEP_INSTALL_DIR)/tools/,$(foreach file,$(TOOLS_SOURCE),$(notdir $(basename $(file)))))
 
-all: yaml-cpp tfhe oblivious-SEAL osprey SEAL
+.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc show
+
+show:
+	@echo $(TOOLS_SOURCE)
+	@echo $(TOOLS_OBJECTS)
+	@echo $(TOOLS_EXECUTABLES)
+
+all: yaml-cpp tfhe oblivious-SEAL osprey mage
+
+mage: yaml-cpp tfhe oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
 		make clean PROJECT_DIR=$(PROJECT_DIR) && \
 		make PROJECT_DIR=$(PROJECT_DIR)
+
+tools: $(TOOLS_EXECUTABLES)
+
+$(TOOLS_EXECUTABLES): $(TOOLS_OBJECTS) $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL emp-tool
+	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
+		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
+		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
+		-L$(PROJECT_DIR)/osprey/bin -l:libosprey.so \
+		-L$(PROJECT_DIR)/install/oblivious-SEAL/lib -l:libseal.so.4.1.1 \
+		-L$(PROJECT_DIR)/install/emp-tool/lib -lemp-tool \
+		-o $@
+
+$(TOOLS_OBJECTS): $(TOOLS_SOURCE) $(DEP_BUILD_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
+	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -mrdseed -mrdrnd -ggdb3 -pthread -DCKKS \
+		-I$(PROJECT_DIR)/install/yaml-cpp/include \
+		-I$(PROJECT_DIR)/install/tfhe/include \
+		-I$(PROJECT_DIR)/osprey \
+		-I$(PROJECT_DIR)/install/oblivious-SEAL/include/SEAL-4.1 \
+		-I$(PROJECT_DIR)/mage/src \
+		-I$(PROJECT_DIR)/install/emp-tool/include \
+		-I$(PROJECT_DIR)/install/emp-ot/include \
+		-I$(PROJECT_DIR)/install/emp-sh2pc/include \
+		-c $< -o $@
+
+$(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
+	mkdir $@ || true
+
+$(DEP_BUILD_DIR)/tools: $(DEP_BUILD_DIR)
+	mkdir $@ || true
 
 yaml-cpp: $(DEP_INSTALL_DIR)/yaml-cpp
 	cd $(PROJECT_DIR)/yaml-cpp && \

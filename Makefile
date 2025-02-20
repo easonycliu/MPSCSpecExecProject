@@ -8,11 +8,6 @@ TOOLS_EXECUTABLES = $(addprefix $(DEP_INSTALL_DIR)/tools/,$(foreach file,$(TOOLS
 
 .PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc show
 
-show:
-	@echo $(TOOLS_SOURCE)
-	@echo $(TOOLS_OBJECTS)
-	@echo $(TOOLS_EXECUTABLES)
-
 all: yaml-cpp tfhe oblivious-SEAL osprey mage
 
 mage: yaml-cpp tfhe oblivious-SEAL osprey
@@ -22,8 +17,8 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 
 tools: $(TOOLS_EXECUTABLES)
 
-$(TOOLS_EXECUTABLES): $(TOOLS_OBJECTS) $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL emp-tool
-	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
+$(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools emp-sh2pc
+	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
 		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
 		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
 		-L$(PROJECT_DIR)/osprey/bin -l:libosprey.so \
@@ -31,8 +26,9 @@ $(TOOLS_EXECUTABLES): $(TOOLS_OBJECTS) $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe os
 		-L$(PROJECT_DIR)/install/emp-tool/lib -lemp-tool \
 		-o $@
 
-$(TOOLS_OBJECTS): $(TOOLS_SOURCE) $(DEP_BUILD_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
-	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -mrdseed -mrdrnd -ggdb3 -pthread -DCKKS \
+$(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools emp-sh2pc
+	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -maes -mrdseed -ggdb3 -pthread \
+		-DBOOST_ALL_NO_LIB -DBOOST_SYSTEM_DYN_LINK -DEMP_CIRCUIT_PATH=$(DEP_INSTALL_DIR)/emp-tool/include/emp-tool/circuits/files/ -DEMP_USE_RANDOM_DEVICE -DCKKS \
 		-I$(PROJECT_DIR)/install/yaml-cpp/include \
 		-I$(PROJECT_DIR)/install/tfhe/include \
 		-I$(PROJECT_DIR)/osprey \
@@ -106,8 +102,14 @@ $(DEP_BUILD_DIR)/emp-ot: $(DEP_BUILD_DIR)
 emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc $(DEP_INSTALL_DIR)/emp-tool $(DEP_INSTALL_DIR)/emp-ot
 	cd $(PROJECT_DIR)/emp-sh2pc && \
 		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" && \
-		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc && \
+		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc --verbose && \
 		cmake --install $(DEP_BUILD_DIR)/emp-sh2pc
+
+$(DEP_INSTALL_DIR)/emp-sh2pc: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-sh2pc
+	mkdir $@ || true
+
+$(DEP_BUILD_DIR)/emp-sh2pc: $(DEP_BUILD_DIR)
+	mkdir $@ || true
 
 $(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/oblivious-SEAL $(PROJECT_DIR)/osprey/bin/libosprey.so
 	mkdir $@ || true

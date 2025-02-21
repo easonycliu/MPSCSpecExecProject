@@ -11,8 +11,35 @@
 
 using namespace emp;
 
+template <std::size_t batch_size, typename T>
+bool read_from_file(int fd, std::vector<T>& output) {
+    std::array<T, batch_size> data;
+    std::size_t read_size;
+    std::cerr << "Read from file" << std::endl;
+    while ((read_size = read(fd, &data, sizeof(T) * batch_size)) > 0) {
+        if (read_size == -1) {
+            std::cout << "Read data failed" << std::endl;
+            return false;
+        }
+        if (read_size % sizeof(T) != 0) {
+            std::cout << "Read data failed" << std::endl;
+            return false;
+        }
+        std::cerr << "Read size: " << read_size << std::endl;
+        std::cerr << "Size of T: " << sizeof(T) << std::endl;
+        read_size /= sizeof(T);
+        std::cerr << "Read size: " << read_size << std::endl;
+        for (std::size_t i = 0; i != read_size; i++) {
+            output.push_back(data[i]);
+        }
+    }
+    return true;
+}
+
 void encrypt_file(int party, char* input_file, char* output_file) {
     std::vector<unsigned char> input_data;
+    std::vector<Integer> alice_encrypt;
+    std::vector<Integer> bob_encrypt;
 
     int input_fd, output_fd;
 
@@ -22,13 +49,10 @@ void encrypt_file(int party, char* input_file, char* output_file) {
         return;
     }
 
-    unsigned char read_data;
-    while (read(input_fd, &read_data, sizeof(unsigned char)) == sizeof(unsigned char)) {
-        input_data.push_back(read_data);
+    if (read_from_file<4096>(input_fd, input_data) == false) {
+        goto exit;
     }
 
-    std::vector<Integer> alice_encrypt;
-    std::vector<Integer> bob_encrypt;
     for (unsigned char data : input_data) {
         alice_encrypt.push_back(Integer((party == ALICE) ? std::bitset<8>(data) : std::bitset<8>(), ALICE));
         bob_encrypt.push_back(Integer((party == BOB) ? std::bitset<8>(data) : std::bitset<8>(), BOB));
@@ -61,6 +85,7 @@ exit:
 
 void decrypt_file(int party, char* input_file, char* output_file) {
     std::vector<std::array<block, 8>> input_data;
+    std::vector<unsigned char> plain;
 
     int input_fd, output_fd;
 
@@ -70,12 +95,10 @@ void decrypt_file(int party, char* input_file, char* output_file) {
         return;
     }
 
-    std::array<block, 8> read_data;
-    while (read(input_fd, &read_data, sizeof(std::array<block, 8>)) == sizeof(std::array<block, 8>)) {
-        input_data.push_back(read_data);
+    if (read_from_file<32>(input_fd, input_data) == false) {
+        goto exit;
     }
 
-    std::vector<unsigned char> plain;
     for (std::array<block, 8> data : input_data) {
         Integer encrypt(8, data.data());
         plain.push_back(static_cast<unsigned char>(encrypt.reveal<8>().to_ulong()));
@@ -98,6 +121,8 @@ exit:
 
 void merge_sorted(int party, char* input_file, char* output_file) {
     std::vector<std::pair<std::array<block, 32>, std::array<block, 96>>> input_data;
+    std::vector<Integer> key;
+    std::vector<Integer> value;
 
     int input_fd, output_fd;
 
@@ -107,14 +132,9 @@ void merge_sorted(int party, char* input_file, char* output_file) {
         return;
     }
 
-    std::pair<std::array<block, 32>, std::array<block, 96>> read_data;
-    while (read(input_fd, &read_data, sizeof(std::pair<std::array<block, 32>, std::array<block, 96>>)) ==
-           sizeof(std::pair<std::array<block, 32>, std::array<block, 96>>)) {
-        input_data.push_back(read_data);
+    if (read_from_file<2>(input_fd, input_data) == false) {
+        goto exit;
     }
-
-    std::vector<Integer> key;
-    std::vector<Integer> value;
 
     for (std::pair<std::array<block, 32>, std::array<block, 96>> data : input_data) {
         key.push_back(Integer(32, data.first.data()));

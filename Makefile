@@ -17,7 +17,7 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 
 tools: $(TOOLS_EXECUTABLES)
 
-$(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools emp-sh2pc
+$(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
 	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
 		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
 		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
@@ -26,7 +26,7 @@ $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools 
 		-L$(PROJECT_DIR)/install/emp-tool/lib -lemp-tool \
 		-o $@
 
-$(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools emp-sh2pc
+$(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
 	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -maes -mrdseed -ggdb3 -pthread \
 		-DBOOST_ALL_NO_LIB -DBOOST_SYSTEM_DYN_LINK -DEMP_CIRCUIT_PATH=$(DEP_INSTALL_DIR)/emp-tool/include/emp-tool/circuits/files/ -DEMP_USE_RANDOM_DEVICE -DCKKS \
 		-I$(PROJECT_DIR)/install/yaml-cpp/include \

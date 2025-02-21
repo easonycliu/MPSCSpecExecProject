@@ -12,7 +12,7 @@
 using namespace emp;
 
 void encrypt_file(int party, char* input_file, char* output_file) {
-    std::vector<std::bitset<64>> input_data;
+    std::vector<unsigned char> input_data;
 
     int input_fd, output_fd;
 
@@ -22,16 +22,16 @@ void encrypt_file(int party, char* input_file, char* output_file) {
         return;
     }
 
-    std::bitset<64> read_data;
-    while (read(input_fd, &read_data, sizeof(std::bitset<64>)) == sizeof(std::bitset<64>)) {
+    unsigned char read_data;
+    while (read(input_fd, &read_data, sizeof(unsigned char)) == sizeof(unsigned char)) {
         input_data.push_back(read_data);
     }
 
     std::vector<Integer> alice_encrypt;
     std::vector<Integer> bob_encrypt;
-    for (std::bitset<64> data : input_data) {
-        alice_encrypt.push_back(Integer((party == ALICE) ? data : std::bitset<64>(), ALICE));
-        bob_encrypt.push_back(Integer((party == BOB) ? data : std::bitset<64>(), BOB));
+    for (unsigned char data : input_data) {
+        alice_encrypt.push_back(Integer((party == ALICE) ? std::bitset<8>(data) : std::bitset<8>(), ALICE));
+        bob_encrypt.push_back(Integer((party == BOB) ? std::bitset<8>(data) : std::bitset<8>(), BOB));
     }
 
     output_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -41,14 +41,14 @@ void encrypt_file(int party, char* input_file, char* output_file) {
     }
 
     for (Integer data : alice_encrypt) {
-        if (write(output_fd, data.bits, sizeof(Bit) * 64) != sizeof(Bit) * 64) {
+        if (write(output_fd, data.bits, sizeof(Bit) * 8) != sizeof(Bit) * 8) {
             std::cout << "Write data failed" << std::endl;
             break;
         }
     }
 
     for (Integer data : bob_encrypt) {
-        if (write(output_fd, data.bits, sizeof(Bit) * 64) != sizeof(Bit) * 64) {
+        if (write(output_fd, data.bits, sizeof(Bit) * 8) != sizeof(Bit) * 8) {
             std::cout << "Write data failed" << std::endl;
             break;
         }
@@ -60,7 +60,7 @@ exit:
 }
 
 void decrypt_file(int party, char* input_file, char* output_file) {
-    std::vector<std::array<block, 64>> input_data;
+    std::vector<std::array<block, 8>> input_data;
 
     int input_fd, output_fd;
 
@@ -70,15 +70,15 @@ void decrypt_file(int party, char* input_file, char* output_file) {
         return;
     }
 
-    std::array<block, 64> read_data;
-    while (read(input_fd, &read_data, sizeof(std::array<block, 64>)) == sizeof(std::array<block, 64>)) {
+    std::array<block, 8> read_data;
+    while (read(input_fd, &read_data, sizeof(std::array<block, 8>)) == sizeof(std::array<block, 8>)) {
         input_data.push_back(read_data);
     }
 
-    std::vector<std::bitset<64>> plain;
-    for (std::array<block, 64> data : input_data) {
-        Integer encrypt(64, data.data());
-        plain.push_back(encrypt.reveal<64>());
+    std::vector<unsigned char> plain;
+    for (std::array<block, 8> data : input_data) {
+        Integer encrypt(8, data.data());
+        plain.push_back(static_cast<unsigned char>(encrypt.reveal<8>().to_ulong()));
     }
 
     output_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -87,9 +87,57 @@ void decrypt_file(int party, char* input_file, char* output_file) {
         goto exit;
     }
 
-    if (write(output_fd, plain.data(), sizeof(std::bitset<64>) * plain.size()) !=
-        sizeof(std::bitset<64>) * plain.size()) {
+    if (write(output_fd, plain.data(), sizeof(unsigned char) * plain.size()) != sizeof(unsigned char) * plain.size()) {
         std::cout << "Write data failed" << std::endl;
+    }
+
+    close(output_fd);
+exit:
+    close(input_fd);
+}
+
+void merge_sorted(int party, char* input_file, char* output_file) {
+    std::vector<std::pair<std::array<block, 32>, std::array<block, 96>>> input_data;
+
+    int input_fd, output_fd;
+
+    input_fd = open(input_file, O_RDONLY);
+    if (input_fd == -1) {
+        std::cout << "Open file failed" << std::endl;
+        return;
+    }
+
+    std::pair<std::array<block, 32>, std::array<block, 96>> read_data;
+    while (read(input_fd, &read_data, sizeof(std::pair<std::array<block, 32>, std::array<block, 96>>)) ==
+           sizeof(std::pair<std::array<block, 32>, std::array<block, 96>>)) {
+        input_data.push_back(read_data);
+    }
+
+    std::vector<Integer> key;
+    std::vector<Integer> value;
+
+    for (std::pair<std::array<block, 32>, std::array<block, 96>> data : input_data) {
+        key.push_back(Integer(32, data.first.data()));
+        value.push_back(Integer(96, data.second.data()));
+    }
+
+    bitonic_merge(key.data(), value.data(), 0, key.size(), true);
+
+    output_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (output_fd == -1) {
+        std::cout << "Open file failed" << std::endl;
+        goto exit;
+    }
+
+    for (std::size_t i = 0; i != key.size(); i++) {
+        if (write(output_fd, key[i].bits, sizeof(Bit) * 32) != sizeof(Bit) * 32) {
+            std::cout << "Write key failed" << std::endl;
+            break;
+        }
+        if (write(output_fd, value[i].bits, sizeof(Bit) * 96) != sizeof(Bit) * 96) {
+            std::cout << "Write value failed" << std::endl;
+            break;
+        }
     }
 
     close(output_fd);
@@ -117,13 +165,11 @@ int main(int argc, char** argv) {
         char* input_file = argv[5];
         char* output_file = argv[6];
 
-        NetIO* io = new NetIO(party == ALICE ? nullptr : other_ip, port);
+        NetIO io(party == ALICE ? nullptr : other_ip, port);
 
-        setup_semi_honest(io, party);
+        setup_semi_honest(&io, party);
 
         encrypt_file(party, input_file, output_file);
-
-        delete io;
     } else if (strcmp(argv[1], "decrypt_file") == 0) {
         if (argc != 7) {
             std::cout << "Usage: " << argv[0] << " decrypt_file [party] [port] [other_ip] [input_file] [output_file]"
@@ -137,13 +183,29 @@ int main(int argc, char** argv) {
         char* input_file = argv[5];
         char* output_file = argv[6];
 
-        NetIO* io = new NetIO(party == ALICE ? nullptr : other_ip, port);
+        NetIO io(party == ALICE ? nullptr : other_ip, port);
 
-        setup_semi_honest(io, party);
+        setup_semi_honest(&io, party);
 
         decrypt_file(party, input_file, output_file);
+    } else if (strcmp(argv[1], "merge_sorted") == 0) {
+        if (argc != 7) {
+            std::cout << "Usage: " << argv[0] << " merge_sorted [party] [port] [other_ip] [input_file] [output_file]"
+                      << std::endl;
+            return 1;
+        }
 
-        delete io;
+        int party = atoi(argv[2]);
+        int port = atoi(argv[3]);
+        char* other_ip = argv[4];
+        char* input_file = argv[5];
+        char* output_file = argv[6];
+
+        NetIO io(party == ALICE ? nullptr : other_ip, port);
+
+        setup_semi_honest(&io, party);
+
+        merge_sorted(party, input_file, output_file);
     }
     auto end = std::chrono::steady_clock::now();
 

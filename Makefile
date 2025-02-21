@@ -1,3 +1,4 @@
+CXX = clang++
 PROJECT_DIR = $(shell pwd)
 DEP_INSTALL_DIR = $(PROJECT_DIR)/install
 DEP_BUILD_DIR = $(PROJECT_DIR)/build
@@ -18,9 +19,10 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 tools: $(TOOLS_EXECUTABLES)
 
 $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
-	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
+	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
 		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
 		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
+		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \
 		-L$(PROJECT_DIR)/osprey/bin -l:libosprey.so \
 		-L$(PROJECT_DIR)/install/oblivious-SEAL/lib -l:libseal.so.4.1.1 \
 		-L$(PROJECT_DIR)/install/emp-tool/lib -lemp-tool \
@@ -31,9 +33,9 @@ $(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools ya
 		-DBOOST_ALL_NO_LIB -DBOOST_SYSTEM_DYN_LINK -DEMP_CIRCUIT_PATH=$(DEP_INSTALL_DIR)/emp-tool/include/emp-tool/circuits/files/ -DEMP_USE_RANDOM_DEVICE -DCKKS \
 		-I$(PROJECT_DIR)/install/yaml-cpp/include \
 		-I$(PROJECT_DIR)/install/tfhe/include \
-		-I$(PROJECT_DIR)/osprey \
 		-I$(PROJECT_DIR)/install/oblivious-SEAL/include/SEAL-4.1 \
 		-I$(PROJECT_DIR)/mage/src \
+		-I$(PROJECT_DIR)/osprey \
 		-I$(PROJECT_DIR)/install/emp-tool/include \
 		-I$(PROJECT_DIR)/install/emp-ot/include \
 		-I$(PROJECT_DIR)/install/emp-sh2pc/include \

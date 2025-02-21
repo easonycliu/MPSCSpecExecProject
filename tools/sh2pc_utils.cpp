@@ -15,7 +15,6 @@ template <std::size_t batch_size, typename T>
 bool read_from_file(int fd, std::vector<T>& output) {
     std::array<T, batch_size> data;
     std::size_t read_size;
-    std::cerr << "Read from file" << std::endl;
     while ((read_size = read(fd, &data, sizeof(T) * batch_size)) > 0) {
         if (read_size == -1) {
             std::cout << "Read data failed" << std::endl;
@@ -25,10 +24,7 @@ bool read_from_file(int fd, std::vector<T>& output) {
             std::cout << "Read data failed" << std::endl;
             return false;
         }
-        std::cerr << "Read size: " << read_size << std::endl;
-        std::cerr << "Size of T: " << sizeof(T) << std::endl;
         read_size /= sizeof(T);
-        std::cerr << "Read size: " << read_size << std::endl;
         for (std::size_t i = 0; i != read_size; i++) {
             output.push_back(data[i]);
         }

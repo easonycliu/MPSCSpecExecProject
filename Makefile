@@ -19,7 +19,7 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 tools: $(TOOLS_EXECUTABLES)
 
 $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
-	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib -pthread -laio -lssl -lcrypto -lboost_random -lboost_system -lgmp \
+	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp \
 		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
 		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
 		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \

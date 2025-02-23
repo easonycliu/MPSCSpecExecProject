@@ -676,7 +676,11 @@ int main(int argc, char** argv) {
 
         std::cout << latency_ms.count() << " ms" << std::endl;
     } else if (std::strcmp(argv[1], "real_tiled_matrix_multiply") == 0) {
-        check_num_args(argc, 6);
+        if (argc != 5 && argc != 6) {
+            std::cerr << "Usage: " << argv[0]
+                      << " real_tiled_matrix_multiply problem_size input_file output_file tile_size" << std::endl;
+            std::abort();
+        }
 
         seal::EncryptionParameters parms = parms_from_file("parms.ckks");
         seal::SEALContext context(parms);
@@ -684,10 +688,15 @@ int main(int argc, char** argv) {
 
         seal::RelinKeys relin_keys = from_file<seal::RelinKeys>(context, "relinkeys.ckks");
 
+        std::size_t memory_size =
+            std::getenv("OSPREY_MEM_LIMIT_HIGH") ? std::stoull(std::getenv("OSPREY_MEM_LIMIT_HIGH")) : 0;
+
         std::size_t problem_size = static_cast<std::size_t>(std::stoi(argv[2]));
-        std::size_t tile_size = static_cast<std::size_t>(std::stoi(argv[3]));
-        std::ifstream input_file(argv[4], std::ios::binary);
-        std::ofstream output_file(argv[5], std::ios::binary);
+        std::ifstream input_file(argv[3], std::ios::binary);
+        std::ofstream output_file(argv[4], std::ios::binary);
+        std::size_t tile_size = (argc == 6) ? static_cast<std::size_t>(std::stoi(argv[5])) : ((memory_size / 2048) + 1);
+
+        std::cout << "Set tile size to " << tile_size << std::endl;
 
         auto start = std::chrono::steady_clock::now();
 

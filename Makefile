@@ -9,17 +9,27 @@ TOOLS_EXECUTABLES = $(addprefix $(DEP_INSTALL_DIR)/tools/,$(foreach file,$(TOOLS
 
 .PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc show
 
-all: yaml-cpp tfhe oblivious-SEAL osprey mage
-
-mage: yaml-cpp tfhe oblivious-SEAL osprey
-	cd $(PROJECT_DIR)/mage && \
-		make clean PROJECT_DIR=$(PROJECT_DIR) && \
-		make PROJECT_DIR=$(PROJECT_DIR)
+all: yaml-cpp tfhe oblivious-SEAL osprey mage tools
 
 tools: $(TOOLS_EXECUTABLES)
 
+mage: yaml-cpp tfhe oblivious-SEAL osprey
+	cd $(PROJECT_DIR)/mage && \
+		make clean PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage && \
+		make PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage && \
+		make lib PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage
+
+$(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
+	mkdir $@ || true
+
 $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc
-	$(CXX) $< -Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib -Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp \
+	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp \
+		-Wl,-rpath,$(DEP_INSTALL_DIR)/yaml-cpp/lib \
+		-Wl,-rpath,$(DEP_INSTALL_DIR)/tfhe/lib \
+		-Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib \
+		-Wl,-rpath,$(PROJECT_DIR)/osprey/bin \
+		-Wl,-rpath,$(DEP_INSTALL_DIR)/oblivious-SEAL/lib \
+		-Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib \
 		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
 		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
 		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \

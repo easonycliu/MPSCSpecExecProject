@@ -90,7 +90,7 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 emp-tool: $(DEP_INSTALL_DIR)/emp-tool
 	cd $(PROJECT_DIR)/emp-tool && \
 		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
-		cmake --build $(DEP_BUILD_DIR)/emp-tool && \
+		cmake --build $(DEP_BUILD_DIR)/emp-tool --verbose && \
 		cmake --install $(DEP_BUILD_DIR)/emp-tool
 
 $(DEP_INSTALL_DIR)/emp-tool: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-tool
@@ -101,7 +101,7 @@ $(DEP_BUILD_DIR)/emp-tool: $(DEP_BUILD_DIR)
 
 emp-ot: $(DEP_INSTALL_DIR)/emp-ot $(DEP_INSTALL_DIR)/emp-tool
 	cd $(PROJECT_DIR)/emp-ot && \
-		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH=$(DEP_INSTALL_DIR)/emp-tool && \
+		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH=$(DEP_INSTALL_DIR)/emp-tool -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
 		cmake --build $(DEP_BUILD_DIR)/emp-ot && \
 		cmake --install $(DEP_BUILD_DIR)/emp-ot
 
@@ -113,7 +113,8 @@ $(DEP_BUILD_DIR)/emp-ot: $(DEP_BUILD_DIR)
 
 emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc $(DEP_INSTALL_DIR)/emp-tool $(DEP_INSTALL_DIR)/emp-ot
 	cd $(PROJECT_DIR)/emp-sh2pc && \
-		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" && \
+		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc \
+		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
 		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc --verbose && \
 		cmake --install $(DEP_BUILD_DIR)/emp-sh2pc
 

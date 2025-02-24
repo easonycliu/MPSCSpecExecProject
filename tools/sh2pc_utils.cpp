@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
         char* input_file = argv[5];
         char* output_file = argv[6];
 
-        NetIO io(party == ALICE ? nullptr : other_ip, port);
+        NetIO io(party == ALICE ? nullptr : other_ip, port, true);
 
         setup_semi_honest(&io, party);
 
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
         char* input_file = argv[5];
         char* output_file = argv[6];
 
-        NetIO io(party == ALICE ? nullptr : other_ip, port);
+        NetIO io(party == ALICE ? nullptr : other_ip, port, true);
 
         setup_semi_honest(&io, party);
 
@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
         char* input_file = argv[5];
         char* output_file = argv[6];
 
-        NetIO io(party == ALICE ? nullptr : other_ip, port);
+        NetIO io(party == ALICE ? nullptr : other_ip, port, true);
 
         setup_semi_honest(&io, party);
 

@@ -7,6 +7,7 @@ FlameGraph
 tmp
 microbenchmark
 perf-tools
+logs
 __pycache__
 
 *.img

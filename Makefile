@@ -35,8 +35,8 @@ $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools 
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/oblivious-SEAL/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/relic/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/senate-emp-tool/lib \
-		-L$(PROJECT_DIR)/install/yaml-cpp/lib -lyaml-cpp \
-		-L$(PROJECT_DIR)/install/tfhe/lib -ltfhe-spqlios-fma \
+		-L$(PROJECT_DIR)/install/yaml-cpp/lib -l:libyaml-cpp.so \
+		-L$(PROJECT_DIR)/install/tfhe/lib -l:libtfhe-spqlios-fma.so \
 		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \
 		-L$(PROJECT_DIR)/osprey/bin -l:libosprey.so \
 		-L$(PROJECT_DIR)/install/oblivious-SEAL/lib -l:libseal.so.4.1.1 \
@@ -130,7 +130,7 @@ $(DEP_INSTALL_DIR)/senate-emp-ot: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/senate-emp
 $(DEP_BUILD_DIR)/senate-emp-ot: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-senate-emp-agmpc: $(DEP_INSTALL_DIR)/senate-emp-agmpc relic senate-emp-tool senate-emp-ot
+senate-emp-agmpc: $(DEP_INSTALL_DIR)/senate-emp-agmpc osprey relic senate-emp-tool senate-emp-ot
 	cd $(PROJECT_DIR)/senate-emp-agmpc && \
 		cmake -B $(DEP_BUILD_DIR)/senate-emp-agmpc \
 		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ \

@@ -53,18 +53,16 @@ std::bitset<N> pop(std::vector<std::uint8_t>& vec) {
     return res;
 }
 
-CMPC* setup(int party, int port, std::size_t party_num, std::string circuit_file, NetIOMP** io, NetIOMP** io2,
-            ThreadPool** pool, CircuitFile** cf) {
+CMPC* setup(int party, int port, std::size_t party_num, std::string circuit_file, NetIOMP** io, NetIOMP** io2, CircuitFile** cf) {
     char* io_ips[] = {"", "127.0.0.1", "127.0.0.1"};
     *io = new NetIOMP(party, port, party_num, io_ips);
     *io2 = new NetIOMP(party, port + 2 * (party_num + 1) * (party_num + 1) + 1, party_num, io_ips);
 
     NetIOMP* ios[2] = {*io, *io2};
 
-    *pool = new ThreadPool(0);
     *cf = new CircuitFile(circuit_file.c_str());
 
-    CMPC* mpc = new CMPC(ios, *pool, party, *cf, party_num);
+    CMPC* mpc = new CMPC(ios, party, *cf, party_num);
     std::cout << "Setup:\t" << party << std::endl;
 
     mpc->function_independent();
@@ -165,9 +163,8 @@ int main(int argc, char** argv) {
     signal(SIGINT, signal_handler);
 
     NetIOMP *io, *io2;
-    ThreadPool* pool;
     CircuitFile* cf;
-    CMPC* mpc = setup(party, port, party_num, circuit_path, &io, &io2, &pool, &cf);
+    CMPC* mpc = setup(party, port, party_num, circuit_path, &io, &io2, &cf);
 
     std::vector<std::uint8_t> in;
     in.reserve(cf->n1 + cf->n2);
@@ -208,11 +205,10 @@ int main(int argc, char** argv) {
         std::cout << "Exiting" << std::endl;
     }
 
-    delete mpc;
-    delete io;
-    delete io2;
-    delete cf;
-    delete pool;
+	delete mpc;
+	delete io;
+	delete io2;
+	delete cf;
 
     return 0;
 }

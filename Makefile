@@ -45,7 +45,7 @@ $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools 
 		-o $@
 
 $(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc
-	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -maes -mrdseed -ggdb3 -pthread \
+	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -maes -mrdseed -ggdb3 -pthread -Wno-deprecated-declarations \
 		-DBOOST_ALL_NO_LIB -DBOOST_SYSTEM_DYN_LINK -DEMP_CIRCUIT_PATH=$(DEP_INSTALL_DIR)/emp-tool/include/emp-tool/circuits/files/ -DEMP_USE_RANDOM_DEVICE -DCKKS \
 		-I$(PROJECT_DIR)/install/yaml-cpp/include \
 		-I$(PROJECT_DIR)/install/tfhe/include \
@@ -106,7 +106,7 @@ $(DEP_INSTALL_DIR)/relic: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/relic
 $(DEP_BUILD_DIR)/relic: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-emp-tool: $(DEP_INSTALL_DIR)/emp-tool relic
+emp-tool: $(DEP_INSTALL_DIR)/emp-tool osprey relic
 	cd $(PROJECT_DIR)/emp-tool && \
 		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DCMAKE_PREFIX_PATH=$(DEP_INSTALL_DIR)/relic && \
 		cmake --build $(DEP_BUILD_DIR)/emp-tool --verbose -j$(JOBS) && \
@@ -118,9 +118,9 @@ $(DEP_INSTALL_DIR)/emp-tool: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-tool
 $(DEP_BUILD_DIR)/emp-tool: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-emp-ot: $(DEP_INSTALL_DIR)/emp-ot relic emp-tool
+emp-ot: $(DEP_INSTALL_DIR)/emp-ot osprey relic emp-tool
 	cd $(PROJECT_DIR)/emp-ot && \
-		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/relic;$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" && \
+		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/relic;$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" && \
 		cmake --build $(DEP_BUILD_DIR)/emp-ot -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-ot
 

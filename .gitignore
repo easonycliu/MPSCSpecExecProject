@@ -12,6 +12,7 @@ microbenchmark
 perf-tools
 logs
 archived
+senate
 __pycache__
 
 *.img

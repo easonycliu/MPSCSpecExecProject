@@ -16,15 +16,15 @@
 [submodule "linux"]
 	path = linux
 	url = git@github.com:easonycliu/MPSCSpecExecLinux.git
-[submodule "senate-emp-tool"]
-	path = senate-emp-tool
-	url = git@github.com:easonycliu/MPSCSpecExecSenateEMPTool.git
-[submodule "senate-emp-ot"]
+[submodule "emp-tool"]
+	path = emp-tool
+	url = git@github.com:easonycliu/MPSCSpecExecEMPTool.git
+[submodule "emp-ot"]
 	path = emp-ot
-	url = git@github.com:easonycliu/MPSCSpecExecSenateEMPOT.git
-[submodule "senate-emp-agmpc"]
-	path = senate-emp-agmpc
-	url = git@github.com:easonycliu/MPSCSpecExecSenateEMPAGMPC.git
+	url = git@github.com:easonycliu/MPSCSpecExecEMPOT.git
+[submodule "emp-agmpc"]
+	path = emp-agmpc
+	url = git@github.com:easonycliu/MPSCSpecExecEMPAGMPC.git
 [submodule "relic"]
 	path = relic
 	url = git@github.com:easonycliu/MPSCSpecExecRelic.git

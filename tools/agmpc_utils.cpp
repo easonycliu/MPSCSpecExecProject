@@ -17,19 +17,6 @@
 
 using namespace emp;
 
-std::atomic<bool> exec;
-
-std::jmp_buf jmp_env;
-
-void signal_handler(int signal) {
-    if (signal == SIGUSR2) {
-        exec.store(true);
-    } else if (signal == SIGINT) {
-        longjmp(jmp_env, 1);
-    }
-    return;
-}
-
 template <std::size_t N>
 void push(std::vector<std::uint8_t>& vec, std::bitset<N> val) {
     for (std::size_t i = 0; i < N; ++i) {
@@ -53,7 +40,8 @@ std::bitset<N> pop(std::vector<std::uint8_t>& vec) {
     return res;
 }
 
-CMPC* setup(int party, int port, std::size_t party_num, std::string circuit_file, NetIOMP** io, NetIOMP** io2, CircuitFile** cf) {
+CMPC* setup(int party, int port, std::size_t party_num, std::string circuit_file, NetIOMP** io, NetIOMP** io2,
+            CircuitFile** cf) {
     char* io_ips[] = {"", "127.0.0.1", "127.0.0.1"};
     *io = new NetIOMP(party, port, party_num, io_ips);
     *io2 = new NetIOMP(party, port + 2 * (party_num + 1) * (party_num + 1) + 1, party_num, io_ips);
@@ -159,9 +147,6 @@ int main(int argc, char** argv) {
     std::string circuit_path = argv[5];
     std::string output_path = argv[6];
 
-    signal(SIGUSR2, signal_handler);
-    signal(SIGINT, signal_handler);
-
     NetIOMP *io, *io2;
     CircuitFile* cf;
     CMPC* mpc = setup(party, port, party_num, circuit_path, &io, &io2, &cf);
@@ -179,36 +164,24 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    if (setjmp(jmp_env) == 0) {
-        while (true) {
-            while (!exec.load()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            exec.store(false);
+    std::cout << "Starting online computing" << std::endl;
 
-            std::cout << "Starting online computing" << std::endl;
+    out.resize(cf->n3);
+    std::chrono::time_point start = std::chrono::high_resolution_clock::now();
+    mpc->online(reinterpret_cast<bool*>(in.data()), reinterpret_cast<bool*>(out.data()));
+    std::chrono::time_point end = std::chrono::high_resolution_clock::now();
 
-            out.resize(cf->n3);
-            std::chrono::time_point start = std::chrono::high_resolution_clock::now();
-            mpc->online(reinterpret_cast<bool*>(in.data()), reinterpret_cast<bool*>(out.data()));
-            std::chrono::time_point end = std::chrono::high_resolution_clock::now();
+    std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start) << std::endl;
 
-            std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-                      << std::endl;
-
-            if (party == 1) {
-                std::cout << "Output size: " << out.size() << std::endl;
-                output(out, output_path);
-            }
-        }
-    } else {
-        std::cout << "Exiting" << std::endl;
+    if (party == 1) {
+        std::cout << "Output size: " << out.size() << std::endl;
+        output(out, output_path);
     }
 
-	delete mpc;
-	delete io;
-	delete io2;
-	delete cf;
+    delete mpc;
+    delete io;
+    delete io2;
+    delete cf;
 
     return 0;
 }

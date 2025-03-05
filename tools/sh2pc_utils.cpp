@@ -83,23 +83,22 @@ bool write_to_file(const std::string& file, const std::vector<std::bitset<width>
 
 template <std::size_t width>
 void encrypt_file(int party, const std::vector<std::bitset<width>>& input_data, std::vector<std::bitset<sizeof(Bit) * width * 8>>& output_data) {
-	std::cout << "Encrypting Alice" << std::endl;
+	std::vector<std::bitset<sizeof(Bit) * width * 8>> alice_output_data;
+	std::vector<std::bitset<sizeof(Bit) * width * 8>> bob_output_data;
     for (std::bitset<width> data : input_data) {
-		Integer encrypt((party == ALICE) ? data : std::bitset<width>(8), ALICE);
-		std::bitset<sizeof(Bit) * width * 8> plain(0);
-		std::memcpy(&plain, encrypt.bits.data(), sizeof(Bit) * width);
-		output_data.push_back(plain);
-    }
-	std::cout << "Encrypting Alice done" << std::endl;
+		Integer alice_encrypt((party == ALICE) ? data : std::bitset<width>(8), ALICE);
+		std::bitset<sizeof(Bit) * width * 8> alice_encrypt_bit(0);
+		std::memcpy(&alice_encrypt_bit, alice_encrypt.bits.data(), sizeof(Bit) * width);
+		alice_output_data.push_back(alice_encrypt_bit);
 
-	std::cout << "Encrypting Bob" << std::endl;
-    for (std::bitset<width> data : input_data) {
-		Integer encrypt((party == BOB) ? data : std::bitset<width>(), BOB);
-		std::bitset<sizeof(Bit) * width * 8> plain(0);
-		std::memcpy(&plain, encrypt.bits.data(), sizeof(Bit) * width);
-		output_data.push_back(plain);
+		Integer bob_encrypt((party == BOB) ? data : std::bitset<width>(), BOB);
+		std::bitset<sizeof(Bit) * width * 8> bob_encrypt_bit(0);
+		std::memcpy(&bob_encrypt_bit, bob_encrypt.bits.data(), sizeof(Bit) * width);
+		bob_output_data.push_back(bob_encrypt_bit);
     }
-	std::cout << "Encrypting Bob done" << std::endl;
+
+	output_data.insert(output_data.end(), alice_output_data.begin(), alice_output_data.end());
+	output_data.insert(output_data.end(), bob_output_data.begin(), bob_output_data.end());
 }
 
 template <std::size_t width>
@@ -234,8 +233,6 @@ int main(int argc, char** argv) {
 	std::vector<std::bitset<width>> output_data;
 
 	read_from_file<width, bs>(input_file, input_data);
-
-	std::cerr << "Input data size: " << input_data.size() << std::endl;
 
     auto start = std::chrono::steady_clock::now();
     if (strcmp(problem_name, "encrypt_file") == 0) {

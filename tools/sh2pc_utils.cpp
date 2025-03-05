@@ -43,8 +43,7 @@ bool read_from_file(const std::string& file, std::vector<std::bitset<width>>& da
         std::byte* bitems = reinterpret_cast<std::byte*>(addr);
         std::bitset<width> item(0);
         for (std::size_t i = 0; i < bytes; i++) {
-            item <<= 8;
-            item |= std::bitset<width>(std::to_integer<int>(bitems[i]));
+            item |= std::bitset<width>(std::to_integer<int>(bitems[i])) << (i * 8);
         }
         data.push_back(item);
     }
@@ -69,7 +68,7 @@ bool write_to_file(const std::string& file, const std::vector<std::bitset<width>
 
     for (std::bitset<width> item : data) {
         for (std::size_t i = 0; i < bytes; i++) {
-            std::byte bitem = static_cast<std::byte>((item >> (bytes - i - 1) * 8).to_ulong());
+            std::byte bitem = static_cast<std::byte>((item >> (i * 8)).to_ulong());
             stream.write(reinterpret_cast<const char*>(&bitem), sizeof(bitem));
         }
     }
@@ -85,8 +84,8 @@ void encrypt_file(int party, const std::vector<std::bitset<width>>& input_data, 
     std::vector<Integer> alice_output_data;
     std::vector<Integer> bob_output_data;
     for (std::bitset<width> data : input_data) {
-        alice_output_data.push_back(Integer((party == ALICE) ? data : std::bitset<width>(8), ALICE));
-        bob_output_data.push_back(Integer((party == BOB) ? data : std::bitset<width>(), BOB));
+        alice_output_data.push_back(Integer((party == ALICE) ? data : std::bitset<width>(0), ALICE));
+        bob_output_data.push_back(Integer((party == BOB) ? data : std::bitset<width>(0), BOB));
     }
     output_data.insert(output_data.end(), alice_output_data.begin(), alice_output_data.end());
     output_data.insert(output_data.end(), bob_output_data.begin(), bob_output_data.end());
@@ -95,7 +94,8 @@ void encrypt_file(int party, const std::vector<std::bitset<width>>& input_data, 
 template <std::size_t width>
 void decrypt_file(int party, const std::vector<Integer>& input_data, std::vector<std::bitset<width>>& output_data) {
     for (Integer data : input_data) {
-        output_data.push_back(data.reveal<width>());
+        std::bitset<width> item = data.reveal<width>();
+        output_data.push_back(item);
     }
 }
 
@@ -152,23 +152,32 @@ int main(int argc, char** argv) {
     NetIO io(party == ALICE ? nullptr : other_ip, port, true);
     setup_semi_honest(&io, party);
 
-    auto start = std::chrono::steady_clock::now();
-
+    std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
     std::vector<Integer> input_data_encrypt;
     encrypt_file(party, input_data, input_data_encrypt);
+    std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
+    std::cout << "Encrypt time: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
+              << std::endl;
 
     std::vector<Integer> output_data_encrypt;
     if (strcmp(problem_name, "merge_sorted") == 0) {
         merge_sorted<width>(party, input_data_encrypt, output_data_encrypt);
     }
+    std::chrono::high_resolution_clock::time_point calc_end = std::chrono::high_resolution_clock::now();
+    std::cout << "Calc time: " << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end - encrypt_end).count()
+              << " ms" << std::endl;
 
     std::vector<std::bitset<width>> output_data;
     decrypt_file(party, output_data_encrypt, output_data);
+    std::chrono::high_resolution_clock::time_point decrypt_end = std::chrono::high_resolution_clock::now();
+    std::cout << "Decrypt time: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - calc_end).count() << " ms"
+              << std::endl;
 
-    auto end = std::chrono::steady_clock::now();
+    std::cout << "Total time: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - encrypt_start).count() << " ms"
+              << std::endl;
 
     write_to_file<width, bs>(output_file, output_data);
-
-    std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Total: " << ms.count() << " ms" << std::endl;
 }

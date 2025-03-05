@@ -2,9 +2,6 @@
 .cmake
 mage-ucbrise
 mage-scripts
-emp-tool
-emp-ot
-emp-agmpc
 SEAL
 FlameGraph
 tmp

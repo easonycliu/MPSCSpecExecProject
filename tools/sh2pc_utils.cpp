@@ -93,9 +93,23 @@ void encrypt_file(int party, const std::vector<std::bitset<width>>& input_data, 
 
 template <std::size_t width>
 void decrypt_file(int party, const std::vector<Integer>& input_data, std::vector<std::bitset<width>>& output_data) {
-    for (Integer data : input_data) {
-        std::bitset<width> item = data.reveal<width>();
-        output_data.push_back(item);
+    constexpr std::size_t bs = 4096;
+    for (std::size_t i = 0; i < input_data.size(); i += bs) {
+        Integer batch(std::vector<Bit>(0));
+        for (std::size_t j = 0; j < bs; j++) {
+            if (i + j < input_data.size()) {
+                batch.bits.insert(batch.bits.end(), input_data[i + j].bits.begin(), input_data[i + j].bits.end());
+            }
+        }
+
+        std::bitset<width* bs> bbatch = batch.reveal<width * bs>();
+        for (std::size_t j = 0; j < width * bs; j += width) {
+            std::bitset<width> item(0);
+            for (std::size_t k = 0; k < width; k++) {
+                item.set(k, bbatch[j + k]);
+            }
+            output_data.push_back(item);
+        }
     }
 }
 

@@ -79,16 +79,33 @@ bool write_to_file(const std::string& file, const std::vector<std::bitset<width>
     return true;
 }
 
+std::size_t exchange_input_size(int party, std::size_t input_size) {
+    Integer alice_input_size(64, input_size, ALICE);
+    Integer bob_dummy(64, 0, BOB);
+    Integer alice_dummy(64, 0, ALICE);
+    Integer bob_input_size(64, input_size, BOB);
+    std::size_t alice_input_size_plain = alice_input_size.reveal<uint64_t>();
+    std::size_t bob_input_size_plain = bob_input_size.reveal<uint64_t>();
+    return (party == ALICE) ? bob_input_size_plain : alice_input_size_plain;
+}
+
 template <std::size_t width>
-void encrypt_file(int party, const std::vector<std::bitset<width>>& input_data, std::vector<Integer>& output_data) {
+void encrypt_file(int party, std::size_t other_input_size, const std::vector<std::bitset<width>>& input_data,
+                  std::vector<Integer>& output_data) {
     std::vector<Integer> alice_output_data;
     std::vector<Integer> bob_output_data;
-    for (std::bitset<width> data : input_data) {
-        alice_output_data.push_back(Integer((party == ALICE) ? data : std::bitset<width>(0), ALICE));
-        bob_output_data.push_back(Integer((party == BOB) ? data : std::bitset<width>(0), BOB));
+
+    std::size_t iters = std::max(input_data.size(), other_input_size);
+    for (std::size_t i = 0; i < iters; i++) {
+        alice_output_data.push_back(
+            Integer((party == ALICE && i < input_data.size()) ? input_data[i] : std::bitset<width>(0), ALICE));
+        bob_output_data.push_back(
+            Integer((party == BOB && i < input_data.size()) ? input_data[i] : std::bitset<width>(0), BOB));
     }
-    output_data.insert(output_data.end(), alice_output_data.begin(), alice_output_data.end());
-    output_data.insert(output_data.end(), bob_output_data.begin(), bob_output_data.end());
+    output_data.insert(output_data.end(), alice_output_data.begin(),
+                       alice_output_data.begin() + ((party == ALICE) ? input_data.size() : other_input_size));
+    output_data.insert(output_data.end(), bob_output_data.begin(),
+                       bob_output_data.begin() + ((party == BOB) ? input_data.size() : other_input_size));
 }
 
 template <std::size_t width>
@@ -103,7 +120,8 @@ void decrypt_file(int party, const std::vector<Integer>& input_data, std::vector
         }
 
         std::bitset<width* bs> bbatch = batch.reveal<width * bs>();
-        for (std::size_t j = 0; j < width * bs; j += width) {
+        std::size_t output_size = std::min(bs, input_data.size() - i);
+        for (std::size_t j = 0; j < width * output_size; j += width) {
             std::bitset<width> item(0);
             for (std::size_t k = 0; k < width; k++) {
                 item.set(k, bbatch[j + k]);
@@ -114,7 +132,8 @@ void decrypt_file(int party, const std::vector<Integer>& input_data, std::vector
 }
 
 template <std::size_t width>
-void merge_sorted(int party, const std::vector<Integer>& input_data, std::vector<Integer>& output_data) {
+void merge_sorted(int party, std::size_t problem_size, const std::vector<Integer>& input_data,
+                  std::vector<Integer>& output_data) {
     static_assert(width % 8 == 0, "Width must be multiple of 8");
 
     constexpr std::size_t bytes = width / 8;
@@ -144,7 +163,8 @@ void merge_sorted(int party, const std::vector<Integer>& input_data, std::vector
 }
 
 template <std::size_t width>
-void full_sort(int party, const std::vector<Integer>& input_data, std::vector<Integer>& output_data) {
+void full_sort(int party, std::size_t problem_size, const std::vector<Integer>& input_data,
+               std::vector<Integer>& output_data) {
     static_assert(width % 8 == 0, "Width must be multiple of 8");
 
     constexpr std::size_t bytes = width / 8;
@@ -174,7 +194,8 @@ void full_sort(int party, const std::vector<Integer>& input_data, std::vector<In
 }
 
 template <std::size_t width>
-void loop_join(int party, const std::vector<Integer>& input_data, std::vector<Integer>& output_data) {
+void loop_join(int party, std::size_t problem_size, const std::vector<Integer>& input_data,
+               std::vector<Integer>& output_data) {
     static_assert(width % 8 == 0, "Width must be multiple of 8");
 
     if (input_data.size() % 8 != 0) {
@@ -209,19 +230,71 @@ void loop_join(int party, const std::vector<Integer>& input_data, std::vector<In
     }
 }
 
+template <std::size_t width>
+void matrix_vector_multiply(int party, std::size_t problem_size, const std::vector<Integer>& input_data,
+                            std::vector<Integer>& output_data) {
+    static_assert(width % 8 == 0, "Width must be multiple of 8");
+
+    constexpr std::size_t bytes = width / 8;
+
+    std::vector<Integer> vector;
+    std::vector<Integer> matrix;
+
+    for (std::size_t i = 0; i < input_data.size(); i++) {
+        if (i < problem_size * problem_size) {
+            matrix.push_back(input_data[i]);
+        } else {
+            vector.push_back(input_data[i]);
+        }
+    }
+
+    for (std::size_t i = 0; i < problem_size; i++) {
+        Integer result(width, 0);
+        for (std::size_t j = 0; j < problem_size; j++) {
+            result = result + (matrix[i * problem_size + j] * vector[j]);
+        }
+        output_data.push_back(result);
+    }
+}
+
+template <std::size_t width>
+void binary_fc_layer(int party, std::size_t problem_size, const std::vector<Integer>& input_data,
+                     std::vector<Integer>& output_data) {
+    static_assert(width % 8 == 0, "Width must be multiple of 8");
+
+    constexpr std::size_t bytes = width / 8;
+
+    std::vector<Integer> weight;
+    std::vector<Integer> input;
+
+    for (std::size_t i = 0; i < input_data.size(); i += 2) {
+        weight.push_back(input_data[i]);
+        input.push_back(input_data[i + 1]);
+    }
+
+    for (std::size_t i = 0; i < input.size(); i++) {
+        Integer result(width, 0);
+        for (std::size_t j = 0; j < weight.size(); j++) {
+            result = result + (weight[j] * input[j]);
+        }
+        output_data.push_back(result);
+    }
+}
+
 int main(int argc, char** argv) {
-    if (argc < 7) {
-        std::cout << "Usage: " << argv[0] << " [problem_name] [party] [port] [other_ip] [input_file] [output_file]"
-                  << std::endl;
+    if (argc != 8) {
+        std::cout << "Usage: " << argv[0]
+                  << " [problem_name] [problem_size] [party] [port] [other_ip] [input_file] [output_file]" << std::endl;
         return 1;
     }
 
     char* problem_name = argv[1];
-    int party = atoi(argv[2]);
-    int port = atoi(argv[3]);
-    char* other_ip = argv[4];
-    char* input_file = argv[5];
-    char* output_file = argv[6];
+    std::size_t problem_size = std::stoull(argv[2]);
+    int party = atoi(argv[3]);
+    int port = atoi(argv[4]);
+    char* other_ip = argv[5];
+    char* input_file = argv[6];
+    char* output_file = argv[7];
 
     constexpr std::size_t width = 32;
     constexpr std::size_t bs = 4096;
@@ -232,9 +305,12 @@ int main(int argc, char** argv) {
     NetIO io(party == ALICE ? nullptr : other_ip, port, true);
     setup_semi_honest(&io, party);
 
+    std::size_t other_input_size = exchange_input_size(party, input_data.size());
+    std::cout << "Other input size: " << other_input_size << std::endl;
+
     std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
     std::vector<Integer> input_data_encrypt;
-    encrypt_file(party, input_data, input_data_encrypt);
+    encrypt_file(party, other_input_size, input_data, input_data_encrypt);
     std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
     std::cout << "Encrypt time: "
               << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
@@ -242,11 +318,13 @@ int main(int argc, char** argv) {
 
     std::vector<Integer> output_data_encrypt;
     if (strcmp(problem_name, "merge_sorted") == 0) {
-        merge_sorted<width>(party, input_data_encrypt, output_data_encrypt);
+        merge_sorted<width>(party, problem_size, input_data_encrypt, output_data_encrypt);
     } else if (strcmp(problem_name, "full_sort") == 0) {
-        full_sort<width>(party, input_data_encrypt, output_data_encrypt);
+        full_sort<width>(party, problem_size, input_data_encrypt, output_data_encrypt);
     } else if (strcmp(problem_name, "loop_join") == 0) {
-        loop_join<width>(party, input_data_encrypt, output_data_encrypt);
+        loop_join<width>(party, problem_size, input_data_encrypt, output_data_encrypt);
+    } else if (strcmp(problem_name, "matrix_vector_multiply") == 0) {
+        matrix_vector_multiply<width>(party, problem_size, input_data_encrypt, output_data_encrypt);
     } else {
         std::cerr << "Unknown problem name" << std::endl;
         return 1;

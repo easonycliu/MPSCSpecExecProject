@@ -351,15 +351,15 @@ int main(int argc, char** argv) {
             for (std::uint64_t i = 0; i != input_size; i++) {
                 std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
                 std::uint8_t elem = static_cast<std::uint8_t>(i);
-                evaluator_writers[w]->write8(elem);
-                expected_writers[w]->write16(elem);
+                evaluator_writers[w]->write32(elem);
+                expected_writers[w]->write32(elem);
             }
             for (std::uint64_t i = 0; i != input_size; i++) {
                 std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
                 for (std::uint64_t j = 0; j != input_size; j++) {
                     std::uint8_t elem = (i == j) ? 1 : 0;
                     /* Identity matrix. */
-                    garbler_writers[w]->write8(elem);
+                    garbler_writers[w]->write32(elem);
                 }
             }
         } else if (option == "random") {

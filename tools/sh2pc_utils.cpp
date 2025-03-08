@@ -143,6 +143,36 @@ void merge_sorted(int party, const std::vector<Integer>& input_data, std::vector
     }
 }
 
+template <std::size_t width>
+void full_sort(int party, const std::vector<Integer>& input_data, std::vector<Integer>& output_data) {
+    static_assert(width % 8 == 0, "Width must be multiple of 8");
+
+    constexpr std::size_t bytes = width / 8;
+
+    std::vector<Integer> key;
+    std::vector<Integer> value;
+
+    for (std::size_t i = 0; i < input_data.size(); i += 4) {
+        key.push_back(input_data[i]);
+
+        Integer vitem(std::vector<Bit>(input_data[i + 1].bits.begin(), input_data[i + 1].bits.end()));
+        vitem.bits.insert(vitem.bits.end(), input_data[i + 2].bits.begin(), input_data[i + 2].bits.end());
+        vitem.bits.insert(vitem.bits.end(), input_data[i + 3].bits.begin(), input_data[i + 3].bits.end());
+        value.push_back(vitem);
+    }
+
+    bitonic_sort(key.data(), value.data(), 0, key.size(), true);
+
+    for (std::size_t i = 0; i != key.size(); i++) {
+        output_data.push_back(key[i]);
+        output_data.push_back(Integer(std::vector<Bit>(value[i].bits.begin(), value[i].bits.begin() + width)));
+        output_data.push_back(
+            Integer(std::vector<Bit>(value[i].bits.begin() + width, value[i].bits.begin() + 2 * width)));
+        output_data.push_back(
+            Integer(std::vector<Bit>(value[i].bits.begin() + 2 * width, value[i].bits.begin() + 3 * width)));
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 7) {
         std::cout << "Usage: " << argv[0] << " [problem_name] [party] [port] [other_ip] [input_file] [output_file]"
@@ -177,7 +207,13 @@ int main(int argc, char** argv) {
     std::vector<Integer> output_data_encrypt;
     if (strcmp(problem_name, "merge_sorted") == 0) {
         merge_sorted<width>(party, input_data_encrypt, output_data_encrypt);
+    } else if (strcmp(problem_name, "full_sort") == 0) {
+        full_sort<width>(party, input_data_encrypt, output_data_encrypt);
+    } else {
+        std::cerr << "Unknown problem name" << std::endl;
+        return 1;
     }
+
     std::chrono::high_resolution_clock::time_point calc_end = std::chrono::high_resolution_clock::now();
     std::cout << "Calc time: " << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end - encrypt_end).count()
               << " ms" << std::endl;

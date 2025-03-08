@@ -173,6 +173,42 @@ void full_sort(int party, const std::vector<Integer>& input_data, std::vector<In
     }
 }
 
+template <std::size_t width>
+void loop_join(int party, const std::vector<Integer>& input_data, std::vector<Integer>& output_data) {
+    static_assert(width % 8 == 0, "Width must be multiple of 8");
+
+    if (input_data.size() % 8 != 0) {
+        std::cerr << "Input data size must be multiple of 8" << std::endl;
+        return;
+    }
+
+    constexpr std::size_t bytes = width / 8;
+
+    Integer zero(width, 0, PUBLIC);
+
+    std::vector<Integer>::const_iterator table1_input_data_begin = input_data.begin();
+    std::vector<Integer>::const_iterator table1_input_data_end = input_data.begin() + input_data.size() / 2;
+    std::vector<Integer>::const_iterator table2_input_data_begin = input_data.begin() + input_data.size() / 2;
+    std::vector<Integer>::const_iterator table2_input_data_end = input_data.end();
+
+    for (std::vector<Integer>::const_iterator i = table1_input_data_begin; i != table1_input_data_end; i += 4) {
+        for (std::vector<Integer>::const_iterator j = table2_input_data_begin; j != table2_input_data_end; j += 4) {
+            Bit valid = i->geq(*j);
+            Integer valid_int(std::vector<Bit>(1, !valid));
+            valid_int.resize(width, false);
+            output_data.push_back(valid_int);
+            output_data.push_back(i->select(valid, zero));
+            output_data.push_back((i + 1)->select(valid, zero));
+            output_data.push_back((i + 2)->select(valid, zero));
+            output_data.push_back((i + 3)->select(valid, zero));
+            output_data.push_back(j->select(valid, zero));
+            output_data.push_back((j + 1)->select(valid, zero));
+            output_data.push_back((j + 2)->select(valid, zero));
+            output_data.push_back((j + 3)->select(valid, zero));
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 7) {
         std::cout << "Usage: " << argv[0] << " [problem_name] [party] [port] [other_ip] [input_file] [output_file]"
@@ -209,6 +245,8 @@ int main(int argc, char** argv) {
         merge_sorted<width>(party, input_data_encrypt, output_data_encrypt);
     } else if (strcmp(problem_name, "full_sort") == 0) {
         full_sort<width>(party, input_data_encrypt, output_data_encrypt);
+    } else if (strcmp(problem_name, "loop_join") == 0) {
+        loop_join<width>(party, input_data_encrypt, output_data_encrypt);
     } else {
         std::cerr << "Unknown problem name" << std::endl;
         return 1;

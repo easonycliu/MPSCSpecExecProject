@@ -209,11 +209,11 @@ int main(int argc, char** argv) {
                     std::uint64_t blocked_party = get_blocked_worker(k, num_workers, join_size);
                     bool valid = (table1_keys[i] < table2_keys[j]);
                     if (valid) {
-                        expected_writers[blocked_party]->write1(1);
+                        expected_writers[blocked_party]->write32(1);
                         write_record(expected_writers[blocked_party].get(), table1_keys[i]);
                         write_record(expected_writers[blocked_party].get(), table2_keys[j]);
                     } else {
-                        expected_writers[blocked_party]->write1(0);
+                        expected_writers[blocked_party]->write32(0);
                         write_record(expected_writers[blocked_party].get(), 0);
                         write_record(expected_writers[blocked_party].get(), 0);
                     }

@@ -257,30 +257,6 @@ void matrix_vector_multiply(int party, std::size_t problem_size, const std::vect
     }
 }
 
-template <std::size_t width>
-void binary_fc_layer(int party, std::size_t problem_size, const std::vector<Integer>& input_data,
-                     std::vector<Integer>& output_data) {
-    static_assert(width % 8 == 0, "Width must be multiple of 8");
-
-    constexpr std::size_t bytes = width / 8;
-
-    std::vector<Integer> weight;
-    std::vector<Integer> input;
-
-    for (std::size_t i = 0; i < input_data.size(); i += 2) {
-        weight.push_back(input_data[i]);
-        input.push_back(input_data[i + 1]);
-    }
-
-    for (std::size_t i = 0; i < input.size(); i++) {
-        Integer result(width, 0);
-        for (std::size_t j = 0; j < weight.size(); j++) {
-            result = result + (weight[j] * input[j]);
-        }
-        output_data.push_back(result);
-    }
-}
-
 int main(int argc, char** argv) {
     if (argc != 8) {
         std::cout << "Usage: " << argv[0]

@@ -369,17 +369,17 @@ int main(int argc, char** argv) {
             for (std::size_t i = 0; i != input_size; i++) {
                 std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
                 vector[i] = distribution(generator);
-                evaluator_writers[w]->write8(vector[i]);
+                evaluator_writers[w]->write32(vector[i]);
             }
             for (std::size_t i = 0; i != input_size; i++) {
                 std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
                 std::uint16_t expected_elem = 0;
                 for (std::size_t j = 0; j != input_size; j++) {
                     std::uint8_t matrix_elem = distribution(generator);
-                    garbler_writers[w]->write8(matrix_elem);
+                    garbler_writers[w]->write32(matrix_elem);
                     expected_elem += static_cast<std::uint16_t>(matrix_elem) * static_cast<std::uint16_t>(vector[j]);
                 }
-                expected_writers[w]->write16(expected_elem);
+                expected_writers[w]->write32(expected_elem);
             }
         } else {
             std::cerr << "Unknown option " << option << std::endl;

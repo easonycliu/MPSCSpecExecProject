@@ -15,8 +15,6 @@ endif
 
 all: yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc tools
 
-tools: $(TOOLS_EXECUTABLES)
-
 mage: yaml-cpp tfhe oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
 		make clean PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage && \
@@ -26,37 +24,8 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 $(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
 	mkdir $@ || true
 
-$(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc
-	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/yaml-cpp/lib \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/tfhe/lib \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib \
-		-Wl,-rpath,$(PROJECT_DIR)/osprey/bin \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/oblivious-SEAL/lib \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/relic/lib \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib \
-		-L$(PROJECT_DIR)/install/yaml-cpp/lib -l:libyaml-cpp.so \
-		-L$(PROJECT_DIR)/install/tfhe/lib -l:libtfhe-spqlios-fma.so \
-		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \
-		-L$(PROJECT_DIR)/osprey/bin -l:libosprey.so \
-		-L$(PROJECT_DIR)/install/oblivious-SEAL/lib -l:libseal.so.4.1.1 \
-		-L$(PROJECT_DIR)/install/relic/lib -l:librelic.so \
-		-L$(PROJECT_DIR)/install/emp-tool/lib -l:libemp-tool.so \
-		-o $@
-
-$(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc
-	$(CXX) -std=c++20 -Ofast -DNDEBUG -fPIE -march=native -maes -mrdseed -ggdb3 -pthread -Wno-deprecated-declarations \
-		-DBOOST_ALL_NO_LIB -DBOOST_SYSTEM_DYN_LINK -DEMP_CIRCUIT_PATH=$(DEP_INSTALL_DIR)/emp-tool/include/emp-tool/circuits/files/ -DEMP_USE_RANDOM_DEVICE -DCKKS \
-		-I$(PROJECT_DIR)/install/yaml-cpp/include \
-		-I$(PROJECT_DIR)/install/tfhe/include \
-		-I$(PROJECT_DIR)/install/oblivious-SEAL/include/SEAL-4.1 \
-		-I$(PROJECT_DIR)/mage/src \
-		-I$(PROJECT_DIR)/osprey \
-		-I$(PROJECT_DIR)/install/relic/include \
-		-I$(PROJECT_DIR)/install/emp-tool/include \
-		-I$(PROJECT_DIR)/install/emp-ot/include \
-		-I$(PROJECT_DIR)/install/emp-sh2pc/include \
-		-c $< -o $@
+tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc
+	make -C $(PROJECT_DIR)/tools -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
 	mkdir $@ || true

@@ -79,14 +79,23 @@ bool write_to_file(const std::string& file, const std::vector<std::bitset<width>
     return true;
 }
 
-std::size_t exchange_input_size(int party, std::size_t input_size) {
-    Integer alice_input_size(64, input_size, ALICE);
-    Integer bob_dummy(64, 0, BOB);
-    Integer alice_dummy(64, 0, ALICE);
-    Integer bob_input_size(64, input_size, BOB);
-    std::size_t alice_input_size_plain = alice_input_size.reveal<uint64_t>();
-    std::size_t bob_input_size_plain = bob_input_size.reveal<uint64_t>();
-    return (party == ALICE) ? bob_input_size_plain : alice_input_size_plain;
+std::size_t get_other_input_size(int party, char* problem_name, std::size_t problem_size) {
+    if (strcmp(problem_name, "merge_sorted") == 0) {
+        return problem_size * 4;
+    } else if (strcmp(problem_name, "full_sort") == 0) {
+        return problem_size * 4;
+    } else if (strcmp(problem_name, "loop_join") == 0) {
+        return problem_size * 4;
+    } else if (strcmp(problem_name, "matrix_vector_multiply") == 0) {
+        if (party == ALICE) {
+            return problem_size;
+        } else {
+            return problem_size * problem_size;
+        }
+    } else {
+        std::cerr << "Unknown problem name " << problem_name << std::endl;
+        std::abort();
+    }
 }
 
 template <std::size_t width>
@@ -278,15 +287,11 @@ int main(int argc, char** argv) {
     std::vector<std::bitset<width>> input_data;
     read_from_file<width, bs>(input_file, input_data);
 
-    NetIO io(party == ALICE ? nullptr : other_ip, port, true);
-    setup_semi_honest(&io, party);
-
-    std::size_t other_input_size = exchange_input_size(party, input_data.size());
-    std::cout << "Other input size: " << other_input_size << std::endl;
+    setup_semi_honest(party, party == ALICE ? nullptr : other_ip, port, 1024 * 16);
 
     std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
     std::vector<Integer> input_data_encrypt;
-    encrypt_file(party, other_input_size, input_data, input_data_encrypt);
+    encrypt_file(party, get_other_input_size(party, problem_name, problem_size), input_data, input_data_encrypt);
     std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
     std::cout << "Encrypt time: "
               << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"

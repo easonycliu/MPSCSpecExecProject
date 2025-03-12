@@ -28,3 +28,6 @@
 [submodule "relic"]
 	path = relic
 	url = git@github.com:easonycliu/MPSCSpecExecRelic.git
+[submodule "MP-SPDZ"]
+	path = MP-SPDZ
+	url = git@github.com:easonycliu/MPSCSpecExecMPSPDZ.git

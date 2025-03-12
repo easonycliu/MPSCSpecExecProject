@@ -99,7 +99,7 @@ std::size_t get_other_input_size(int party, char* problem_name, std::size_t prob
 }
 
 template <std::size_t width>
-void encrypt_file(int party, std::size_t other_input_size, const std::vector<std::bitset<width>>& input_data,
+void encrypt_file(int party, std::size_t other_input_size, NetIO& io, const std::vector<std::bitset<width>>& input_data,
                   std::vector<Integer>& output_data) {
     std::vector<Integer> alice_output_data;
     std::vector<Integer> bob_output_data;
@@ -111,6 +111,7 @@ void encrypt_file(int party, std::size_t other_input_size, const std::vector<std
         bob_output_data.push_back(
             Integer((party == BOB && i < input_data.size()) ? input_data[i] : std::bitset<width>(0), BOB));
     }
+    io.flush();
     output_data.insert(output_data.end(), alice_output_data.begin(),
                        alice_output_data.begin() + ((party == ALICE) ? input_data.size() : other_input_size));
     output_data.insert(output_data.end(), bob_output_data.begin(),
@@ -287,11 +288,12 @@ int main(int argc, char** argv) {
     std::vector<std::bitset<width>> input_data;
     read_from_file<width, bs>(input_file, input_data);
 
-    setup_semi_honest(party, party == ALICE ? nullptr : other_ip, port, 1024 * 16);
+    NetIO io(party == ALICE ? nullptr : other_ip, port, true);
+    setup_semi_honest(&io, party);
 
     std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
     std::vector<Integer> input_data_encrypt;
-    encrypt_file(party, get_other_input_size(party, problem_name, problem_size), input_data, input_data_encrypt);
+    encrypt_file(party, get_other_input_size(party, problem_name, problem_size), io, input_data, input_data_encrypt);
     std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
     std::cout << "Encrypt time: "
               << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"

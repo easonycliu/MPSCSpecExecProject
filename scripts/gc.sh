@@ -7,9 +7,7 @@ compile=
 compile_flags=
 
 input_size=
-round_num=
 mem_limit=
-calculate_only=
 workload=
 
 batch_size=1
@@ -54,14 +52,8 @@ for flag in "$@"; do
 		--input_size=*)
 			input_size=$(echo $flag | awk -F = '{print $2}')
 			;;
-		--round_num=*)
-			round_num=$(echo $flag | awk -F = '{print $2}')
-			;;
 		--mem_limit=*)
 			mem_limit=$(echo $flag | awk -F = '{print $2}')
-			;;
-		--calculate_only)
-			calculate_only=true
 			;;
 		--workload=*)
 			workload=$(echo $flag | awk -F = '{print $2}')
@@ -107,26 +99,17 @@ if [ "${compile}" == "true" ]; then
 	popd
 fi
 
-if [ "${calculate_only}" == "true" ]; then
-	playground_dir=${project_dir}/logs/playground
-fi
-
 mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
-if [ "${calculate_only}" != "true" ]; then
-	${EXAMPLE_INPUT} ${workload} ${input_size} 1
-	${SH2PC_UTILS} encrypt_file 1 50000 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.encrypt &
-	sleep 1
-	${SH2PC_UTILS} encrypt_file 2 50000 127.0.0.1 ${workload}_${input_size}_0_evaluator.input ${workload}_${input_size}_0_evaluator.encrypt
-fi
+${EXAMPLE_INPUT} ${workload} ${input_size} 1
 
 echo expected output is $(od -An -l ${workload}_${input_size}_0.expected | tail -n 2)
 
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-${SH2PC_UTILS} ${workload} 1 50000 127.0.0.1 ${workload}_${input_size}_0_garbler.encrypt ${workload}_${input_size}_0_garbler.encrypt.output &
+${SUDO} ${tool_cmd} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output &
 sleep 1
-${SUDO} ${tool_cmd} ${SH2PC_UTILS} ${workload} 2 50000 127.0.0.1 ${workload}_${input_size}_0_evaluator.encrypt ${workload}_${input_size}_0_evaluator.encrypt.output
+${SUDO} ${tool_cmd} ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 127.0.0.1 ${workload}_${input_size}_0_evaluator.input ${workload}_${input_size}_0_evaluator.output
 elif [ "${tool}" == "mage" ]; then
 	page_shift=21
 	num_pages=32768
@@ -161,19 +144,13 @@ EOF
 	$SUDO mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
 fi
 
-${SH2PC_UTILS} decrypt_file 1 50000 127.0.0.1 ${workload}_${input_size}_0_garbler.encrypt.output ${workload}_${input_size}_0_garbler.output &
-sleep 1
-${SH2PC_UTILS} decrypt_file 2 50000 127.0.0.1 ${workload}_${input_size}_0_evaluator.encrypt.output ${workload}_${input_size}_0_evaluator.output
-
 echo real output is $(od -An -l ${workload}_${input_size}_0_garbler.output | tail -n 2)
-
-if [ "${calculate_only}" != "true" ]; then
-	mkdir -p ${project_dir}/logs/playground
-	cp * ${project_dir}/logs/playground
-fi
 
 popd
 
 if [ "${mem_limit}" != "" ]; then
 	$SUDO cgdelete memory:/osprey
 fi
+
+stty sane
+echo ""

@@ -1,6 +1,7 @@
 BasedOnStyle: LLVM
 
 AccessModifierOffset: -4
+AlignAfterOpenBracket: BlockIndent
 AlignTrailingComments: false
 AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
@@ -8,11 +9,14 @@ AllowShortLambdasOnASingleLine: None
 AlwaysBreakTemplateDeclarations: Yes
 ColumnLimit: 120
 FixNamespaceComments: false
+UseTab: Always
 IndentWidth: 4
+TabWidth: 4
 NamespaceIndentation: All
 # Note: DerivePointerAlignment is false in the LLVM style
 PointerAlignment: Left
 SpaceAfterCStyleCast: true
+SeparateDefinitionBlocks: Always
 Standard: c++20
 
 # Formatting for #include statements is based on Google's style guide

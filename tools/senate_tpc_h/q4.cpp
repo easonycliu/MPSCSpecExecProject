@@ -247,7 +247,11 @@ namespace senate_tpc_h_q4 {
     }
 
     std::size_t get_other_input_size(int party, std::size_t problem_size) {
-        return 0;
+        if (party == 1) {
+            return problem_size;
+        } else {
+            return 2 * problem_size;
+        }
     }
 
     // join o_order_key on l_order_key

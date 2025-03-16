@@ -588,6 +588,40 @@ int main(int argc, char** argv) {
         } else {
             std::cerr << "Unknown option " << option << std::endl;
         }
+    } else if (problem_name == "tpc_h_q4") {
+        for (std::uint64_t i = 0; i != input_size; i++) {
+            std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size);
+            garbler_writers[blocked_party]->write32(i);
+            garbler_writers[blocked_party]->write32(1);
+        }
+
+        for (std::uint64_t i = 0; i != input_size; i++) {
+            std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size);
+            evaluator_writers[blocked_party]->write32(i);
+        }
+    } else if (problem_name == "tpc_h_q8") {
+        for (std::uint64_t i = 0; i != input_size; i++) {
+            std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size);
+            garbler_writers[blocked_party]->write32(i * 8);
+            garbler_writers[blocked_party]->write32(i * 8 + 1);
+            garbler_writers[blocked_party]->write32(i * 8 + 2);
+            garbler_writers[blocked_party]->write32(i * 8 + 3);
+            garbler_writers[blocked_party]->write32(i * 8 + 4);
+            garbler_writers[blocked_party]->write32(i * 8 + 5);
+            garbler_writers[blocked_party]->write32(i * 8 + 6);
+            garbler_writers[blocked_party]->write32(i * 8 + 7);
+        }
+        for (std::uint64_t i = 0; i != input_size; i++) {
+            std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 1);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 2);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 3);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 4);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 5);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 6);
+            evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 7);
+        }
     } else {
         std::cerr << "Unknown problem " << problem_name << std::endl;
     }

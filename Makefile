@@ -11,9 +11,9 @@ ifndef JOBS
 JOBS := $(shell nproc)
 endif
 
-.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc show
+.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ show
 
-all: yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc tools
+all: yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ tools
 
 mage: yaml-cpp tfhe oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
@@ -24,7 +24,7 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 $(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
 	mkdir $@ || true
 
-tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc
+tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ
 	make -C $(PROJECT_DIR)/tools -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
@@ -113,6 +113,29 @@ $(DEP_INSTALL_DIR)/emp-sh2pc: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-sh2pc
 $(DEP_BUILD_DIR)/emp-sh2pc: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
+MP-SPDZ: $(DEP_INSTALL_DIR)/MP-SPDZ libOTe osprey
+	cd $(PROJECT_DIR)/MP-SPDZ && \
+		make -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR) OSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
+		cp -r $(PROJECT_DIR)/MP-SPDZ/* $(DEP_INSTALL_DIR)/MP-SPDZ
+
+$(DEP_INSTALL_DIR)/MP-SPDZ: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/MP-SPDZ
+	mkdir $@ || true
+
+$(DEP_BUILD_DIR)/MP-SPDZ: $(DEP_BUILD_DIR)
+	mkdir $@ || true
+
+libOTe: $(DEP_INSTALL_DIR)/libOTe
+	cd $(PROJECT_DIR)/libOTe && \
+		cmake -B $(DEP_BUILD_DIR)/libOTe -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DENABLE_SOFTSPOKEN_OT=ON -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_LIBDIR=lib -DENABLE_AVX=ON -DENABLE_SSE=ON && \
+		cmake --build $(DEP_BUILD_DIR)/libOTe -j$(JOBS) && \
+		cmake --install $(DEP_BUILD_DIR)/libOTe
+
+$(DEP_INSTALL_DIR)/libOTe: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/libOTe
+	mkdir $@ || true
+
+$(DEP_BUILD_DIR)/libOTe: $(DEP_BUILD_DIR)
+	mkdir $@ || true
+
 $(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/oblivious-SEAL $(PROJECT_DIR)/osprey/bin/libosprey.so
 	mkdir $@ || true
 
@@ -135,5 +158,6 @@ install_deps:
 clean:
 	cd $(PROJECT_DIR)/osprey && make clean PROJECT_DIR=$(PROJECT_DIR)
 	cd $(PROJECT_DIR)/mage && make clean PROJECT_DIR=$(PROJECT_DIR)
+	cd $(PROJECT_DIR)/MP-SPDZ && make clean PROJECT_DIR=$(PROJECT_DIR)
 	cd $(PROJECT_DIR) && rm -rf $(DEP_BUILD_DIR) && rm -rf $(DEP_INSTALL_DIR)
 

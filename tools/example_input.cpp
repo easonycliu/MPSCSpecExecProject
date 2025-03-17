@@ -626,6 +626,39 @@ int main(int argc, char** argv) {
 			evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 6);
 			evaluator_writers[blocked_party]->write32(i * 8 + input_size * 8 + 7);
 		}
+	} else if (problem_name == "mpspdz_matrix_multiply") {
+		std::uint8_t log_num_workers = mage::util::log_base_2(num_workers);
+		std::uint32_t num_portions_a = UINT32_C(1) << ((log_num_workers / 2) + (log_num_workers % 2));
+		std::uint32_t num_portions_b = UINT32_C(1) << (log_num_workers / 2);
+		std::uint32_t portion_size_a = input_size / num_portions_a;
+		std::uint32_t portion_size_b = input_size / num_portions_b;
+
+		for (std::uint64_t i = 0; i != input_size; i++) {
+			for (std::uint64_t j = 0; j != input_size; j++) {
+				float elem = (i == j) ? 1.0 : 0.0;
+				/* Identity matrix, so we don't have to worry about row-major vs. column major --- both are
+				 * identical. */
+				garbler_writers[get_blocked_worker(i * input_size + j, num_workers, input_size * input_size)]->write32(
+					elem
+				);
+
+				/* Write to row i, col j of expected matrix. */
+				std::uint32_t a_portion = i / portion_size_a;
+				std::uint32_t b_portion = j / portion_size_b;
+				expected_writers[a_portion * num_portions_b + b_portion]->write32(elem);
+			}
+		}
+
+		for (std::uint64_t i = 0; i != input_size; i++) {
+			for (std::uint64_t j = 0; j != input_size; j++) {
+				float elem = (i == j) ? 1.0 : 0.0;
+				/* Identity matrix, so we don't have to worry about row-major vs. column major --- both are
+				 * identical. */
+				garbler_writers[get_blocked_worker(i * input_size + j, num_workers, input_size * input_size)]->write32(
+					elem
+				);
+			}
+		}
 	} else {
 		std::cerr << "Unknown problem " << problem_name << std::endl;
 	}

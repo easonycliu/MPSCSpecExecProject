@@ -104,6 +104,7 @@ void mpspdz_matrix_multiply(
 			for (std::size_t k = 1; k < problem_size; k++) {
 				matrix_output[i][j] += matrix_a[i][k].mul(keypair.pk, matrix_b[k][j]);
 			}
+			std::cerr << "Calc: " << i << " " << j << std::endl;
 		}
 	}
 

@@ -403,22 +403,6 @@ void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyCon
 	}
 }
 
-void programmed_backing_thread_function(const OspreyConfig& config, const ProgrammedProcessInfo& programmed_info) {
-	osprey::memprog::PageFaultWatcher watcher =
-		osprey::memprog::PageFaultWatcher::receive_from_unix_socket(programmed_info.child_comm_fd, "Programmed ", true);
-
-	/*
-	 * At this point, we know that the child process is sufficiently
-	 * initialized. If we construct this too early, then the pagemap
-	 * file may appear to be empty.
-	 */
-	osprey::memprog::Buffered3POProgrammer buffered_3po_programmer(
-		programmed_info.child_pid, programmed_info.trace_fd, config.mem_limit_low, config.mem_limit_high,
-		config.mem_limit_max, config.batch_size, true
-	);
-	program_memory_with_buffered_trace(watcher, buffered_3po_programmer, programmed_info.exit_fd);
-}
-
 int programmed_only(OspreyConfig& config) {
 	ProgrammedProcessInfo programmed_info;
 
@@ -437,60 +421,16 @@ int programmed_only(OspreyConfig& config) {
 
 	launch_programmed_process(programmed_info, config, trace_fd);
 
-	if (config.program_from_parent) {
-		programmed_info.trace_fd = trace_fd;
-		programmed_info.backing_thread = std::thread([&config, &programmed_info]() {
-			programmed_backing_thread_function(config, programmed_info);
-		});
+	if (close(trace_fd) != 0) {
+		std::perror("close(trace_fd)");
+		return EXIT_FAILURE;
+	}
 
-		/*
-		 * Wait for child to exit, but don't call wait(); let it exist as a zombie
-		 * process for the time being.
-		 */
-		{
-			struct pollfd child_poll;
-			child_poll.fd = programmed_info.child_fd;
-			child_poll.events = POLLIN;
-			if (poll(&child_poll, 1, -1) != 1) {
-				std::perror("poll");
-				return EXIT_FAILURE;
-			}
-			if (child_poll.revents != POLLIN) {
-				std::cerr << "Unexpected poll event" << std::endl;
-				return EXIT_FAILURE;
-			}
-		}
-
-		/* Child has exited; now signal the backing thread to exit, and wait for it to do so. */
-		{
-			const constexpr std::uint64_t one = 1;
-			if (write(programmed_info.exit_fd, &one, sizeof(one)) == -1) {
-				std::perror("write");
-				return EXIT_FAILURE;
-			}
-		}
-		programmed_info.backing_thread.join();
-
-		/* Now, reap the zombie child. */
-		{
-			int child_status;
-			if (waitpid(programmed_info.child_pid, &child_status, 0) != programmed_info.child_pid) {
-				std::perror("waitpid");
-				return EXIT_FAILURE;
-			}
-		}
-	} else {
-		if (close(trace_fd) != 0) {
-			std::perror("close(trace_fd)");
-			return EXIT_FAILURE;
-		}
-
-		/* Reap the child. */
-		int child_status;
-		if (waitpid(programmed_info.child_pid, &child_status, 0) != programmed_info.child_pid) {
-			std::perror("waitpid");
-			return EXIT_FAILURE;
-		}
+	/* Reap the child. */
+	int child_status;
+	if (waitpid(programmed_info.child_pid, &child_status, 0) != programmed_info.child_pid) {
+		std::perror("waitpid");
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
@@ -517,75 +457,22 @@ int speculative_and_programmed(OspreyConfig& config) {
 		std::perror("eventfd");
 		return EXIT_FAILURE;
 	}
-	if (config.program_from_parent) {
-		programmed_info.trace_fd = speculative_info.child_memprog_fd;
-		programmed_info.backing_thread = std::thread([&config, &programmed_info]() {
-			programmed_backing_thread_function(config, programmed_info);
-		});
+	if (close(speculative_info.child_memprog_fd) != 0) {
+		std::perror("close(memprog_fd)");
+		return EXIT_FAILURE;
+	}
 
-		/*
-		 * Wait for child to exit, but don't call wait(); let it exist as a zombie
-		 * process for the time being.
-		 */
-		{
-			struct pollfd child_poll;
-			child_poll.fd = programmed_info.child_fd;
-			child_poll.events = POLLIN;
-			if (poll(&child_poll, 1, -1) != 1) {
-				std::perror("poll");
-				return EXIT_FAILURE;
-			}
-			if (child_poll.revents != POLLIN) {
-				std::cerr << "Unexpected poll event" << std::endl;
-				return EXIT_FAILURE;
-			}
-		}
+	/* Reap the programmed child. */
+	int child_status;
+	if (waitpid(programmed_info.child_pid, &child_status, 0) != programmed_info.child_pid) {
+		std::perror("waitpid");
+		return EXIT_FAILURE;
+	}
 
-		/* Child has exited; now signal the backing thread to exit, and wait for it to do so. */
-		{
-			const constexpr std::uint64_t one = 1;
-			if (write(programmed_info.exit_fd, &one, sizeof(one)) == -1) {
-				std::perror("write");
-				return EXIT_FAILURE;
-			}
-		}
-		programmed_info.backing_thread.join();
-
-		/* Now, reap the zombie child. */
-		{
-			int child_status;
-			if (waitpid(programmed_info.child_pid, &child_status, 0) != programmed_info.child_pid) {
-				std::perror("waitpid");
-				return EXIT_FAILURE;
-			}
-		}
-
-		/* Now, reap the speculative child. */
-		{
-			int child_status;
-			if (waitpid(speculative_info.child_pid, &child_status, 0) != speculative_info.child_pid) {
-				std::perror("waitpid");
-				return EXIT_FAILURE;
-			}
-		}
-	} else {
-		if (close(speculative_info.child_memprog_fd) != 0) {
-			std::perror("close(memprog_fd)");
-			return EXIT_FAILURE;
-		}
-
-		/* Reap the programmed child. */
-		int child_status;
-		if (waitpid(programmed_info.child_pid, &child_status, 0) != programmed_info.child_pid) {
-			std::perror("waitpid");
-			return EXIT_FAILURE;
-		}
-
-		/* Reap the speculative child. */
-		if (waitpid(speculative_info.child_pid, &child_status, 0) != speculative_info.child_pid) {
-			std::perror("waitpid");
-			return EXIT_FAILURE;
-		}
+	/* Reap the speculative child. */
+	if (waitpid(speculative_info.child_pid, &child_status, 0) != speculative_info.child_pid) {
+		std::perror("waitpid");
+		return EXIT_FAILURE;
 	}
 
 	/* Cleanup overlay. */
@@ -606,7 +493,6 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
         ("speculative-only", po::bool_switch(&config.speculative_only), "only run speculative pass")
         ("programmed-only", po::bool_switch(&config.programmed_only), "only run programmed pass")
         ("cleanup-only", po::bool_switch(&config.cleanup_overlays), "only clean up overlays")
-        ("program-from-parent", po::bool_switch(&config.program_from_parent), "process trace and run programming logic in parent process")
         ("tracing-algorithm", po::value<std::string>(&config.tracing_algorithm)->default_value("MICROSET"), "algorithm to use for extracting the memory access pattern (MICROSET or FIFO)")
         ("window-size", po::value<std::size_t>(&config.window_size)->default_value(16384), "window size to use for tracing")
         ("trace-file", po::value<std::string>(&config.trace_filepath), "write access pattern trace to file at specified path (if empty string, this is disabled)")

@@ -53,7 +53,7 @@ struct OspreyConfig {
 	bool speculative_only;
 	std::string tracing_algorithm;
 	std::size_t window_size;
-	std::string trace_filepath;
+	std::string trace_filebase;
 	bool trace_to_stdout;
 
 	bool programmed_only;
@@ -75,7 +75,6 @@ struct OspreyConfig {
 struct SpeculativeProcessInfo {
 	pid_t child_pid;
 	int child_comm_fd;
-	int child_memprog_fd;
 	std::thread backing_thread;
 };
 
@@ -83,8 +82,6 @@ struct ProgrammedProcessInfo {
 	pid_t child_pid;
 	int child_fd;
 	int child_comm_fd;
-	int trace_fd;
-	int exit_fd;
 	std::thread backing_thread;
 };
 
@@ -96,44 +93,8 @@ void print_usage(const char* osprey_name, bool show_help_hint = true) {
 }
 
 void launch_speculative_process(
-	SpeculativeProcessInfo& speculative_info, OspreyConfig& config, const osprey::util::Overlay* speculative_overlay,
-	int speculative_memprog_fd
+	SpeculativeProcessInfo& speculative_info, OspreyConfig& config, const osprey::util::Overlay* speculative_overlay
 ) {
-	/* For communicating memory access patterns, etc. */
-	int memprog_fds[2];
-	if (speculative_memprog_fd == -1) {
-		// if (pipe2(memprog_fds, O_NONBLOCK) != 0) {
-		//     std::perror("pipe2");
-		//     std::exit(EXIT_FAILURE);
-		// }
-
-		// if (fcntl(memprog_fds[0], F_SETPIPE_SZ, 1024 * 1024) == -1) {
-		//     std::perror("fcntl");
-		//     std::exit(EXIT_FAILURE);
-		// }
-
-		std::string shm_name = osprey::util::QUEUE_NAME + "_shm";
-		int shm_fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR, 0666);
-		if (shm_fd == -1) {
-			std::perror("shm_open");
-			std::exit(EXIT_FAILURE);
-		}
-
-		memprog_fds[0] = shm_fd;
-		memprog_fds[1] = dup(shm_fd);
-		if (memprog_fds[1] == -1) {
-			std::perror("dup");
-			std::exit(EXIT_FAILURE);
-		}
-	} else {
-		memprog_fds[0] = speculative_memprog_fd;
-		memprog_fds[1] = dup(speculative_memprog_fd);
-		if (memprog_fds[1] == -1) {
-			std::perror("dup");
-			std::exit(EXIT_FAILURE);
-		}
-	}
-
 	/* For parent-child communication. */
 	int comm_fds[2];
 	if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, comm_fds) != 0) {
@@ -149,6 +110,13 @@ void launch_speculative_process(
 			std::exit(EXIT_FAILURE);
 		}
 
+		if (!config.trace_filebase.empty()) {
+			if (setenv("OSPREY_TRACE_FILEBASE", config.trace_filebase.c_str(), 1) != 0) {
+				std::perror("setenv");
+				std::exit(EXIT_FAILURE);
+			}
+		}
+
 		std::string window_size_string = std::to_string(config.window_size);
 		if (setenv("OSPREY_WINDOW_SIZE", window_size_string.c_str(), 1) != 0) {
 			std::perror("setenv");
@@ -157,24 +125,6 @@ void launch_speculative_process(
 
 		if (setenv("OSPREY_TRACING_ALGORITHM", config.tracing_algorithm.c_str(), 1) != 0) {
 			std::perror("setenv");
-			std::exit(EXIT_FAILURE);
-		}
-
-		/* Set up pipe for memory info. */
-		if (fcntl(osprey::lib::memprog_fd, F_GETFD) != -1 || errno != EBADF) {
-			std::cerr << "Fatal error: existing file descriptor conflicts with osprey::lib::memprog_fd" << std::endl;
-			std::exit(EXIT_FAILURE);
-		}
-		if (dup2(memprog_fds[1], osprey::lib::memprog_fd) == -1) {
-			std::perror("dup2");
-			std::exit(EXIT_FAILURE);
-		}
-		if (close(memprog_fds[0]) != 0) {
-			std::perror("close");
-			std::exit(EXIT_FAILURE);
-		}
-		if (close(memprog_fds[1]) != 0) {
-			std::perror("close");
 			std::exit(EXIT_FAILURE);
 		}
 
@@ -212,18 +162,8 @@ void launch_speculative_process(
 				  << std::endl;
 		std::exit(EXIT_FAILURE);
 	} else if (child_pid > 0) {
-		if (close(memprog_fds[1]) != 0) {
-			std::perror("close");
-			std::exit(EXIT_FAILURE);
-		}
-		if (close(comm_fds[1]) != 0) {
-			std::perror("close");
-			std::exit(EXIT_FAILURE);
-		}
-
 		speculative_info.child_pid = child_pid;
 		speculative_info.child_comm_fd = comm_fds[0];
-		speculative_info.child_memprog_fd = memprog_fds[0];
 
 		/*
 		 * Ensure that any file descriptors we've opened aren't unwittingly
@@ -231,10 +171,6 @@ void launch_speculative_process(
 		 */
 		if (fcntl(speculative_info.child_comm_fd, F_SETFD, FD_CLOEXEC) != 0) {
 			std::perror("fcntl(speculative_info.child_comm_fd, F_SETFD, FD_CLOEXEC)");
-			std::exit(EXIT_FAILURE);
-		}
-		if (fcntl(speculative_info.child_memprog_fd, F_SETFD, FD_CLOEXEC) != 0) {
-			std::perror("fcntl(speculative_info.child_memprog_fd, F_SETFD, FD_CLOEXEC)");
 			std::exit(EXIT_FAILURE);
 		}
 	} else {
@@ -246,25 +182,13 @@ void launch_speculative_process(
 int speculative_only(OspreyConfig& config) {
 	SpeculativeProcessInfo speculative_info;
 
-	int speculative_memprog_fd = open(config.trace_filepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (speculative_memprog_fd == -1) {
-		std::string error_string = "open(" + config.trace_filepath + ", O_RDONLY)";
-		std::perror(error_string.c_str());
-		return EXIT_FAILURE;
-	}
-
 	/* Setup overlay for speculative process. */
 	std::unique_ptr<osprey::util::Overlay> speculative_overlay;
 	if (!config.no_overlay) {
 		speculative_overlay = osprey::util::Overlay::create_overlay();
 	}
 
-	launch_speculative_process(speculative_info, config, speculative_overlay.get(), speculative_memprog_fd);
-
-	if (close(speculative_memprog_fd) != 0) {
-		std::perror("close");
-		return EXIT_FAILURE;
-	}
+	launch_speculative_process(speculative_info, config, speculative_overlay.get());
 
 	/* Now, reap the child. */
 	{
@@ -283,7 +207,7 @@ int speculative_only(OspreyConfig& config) {
 	return EXIT_SUCCESS;
 }
 
-void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyConfig& config, int memprog_read_fd) {
+void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyConfig& config) {
 	/* For parent-child communication. */
 	int comm_fds[2];
 	if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, comm_fds) != 0) {
@@ -297,6 +221,13 @@ void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyCon
 		if (setenv("OSPREY_MODE", "PROGRAMMED", 1) != 0) {
 			std::perror("setenv");
 			std::exit(EXIT_FAILURE);
+		}
+
+		if (!config.trace_filebase.empty()) {
+			if (setenv("OSPREY_TRACE_FILEBASE", config.trace_filebase.c_str(), 1) != 0) {
+				std::perror("setenv");
+				std::exit(EXIT_FAILURE);
+			}
 		}
 
 		std::string mem_limit_low_string = std::to_string(config.mem_limit_low);
@@ -333,20 +264,6 @@ void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyCon
 				std::perror("setenv");
 				std::exit(EXIT_FAILURE);
 			}
-		}
-
-		/* Set up pipe for memory info. */
-		if (fcntl(osprey::lib::memprog_fd, F_GETFD) != -1 || errno != EBADF) {
-			std::cerr << "Fatal error: existing file descriptor conflicts with osprey::lib::memprog_fd" << std::endl;
-			std::exit(EXIT_FAILURE);
-		}
-		if (dup2(memprog_read_fd, osprey::lib::memprog_fd) == -1) {
-			std::perror("dup2");
-			std::exit(EXIT_FAILURE);
-		}
-		if (close(memprog_read_fd) != 0) {
-			std::perror("close");
-			std::exit(EXIT_FAILURE);
 		}
 
 		/* Set up communication with parent. */
@@ -406,25 +323,7 @@ void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyCon
 int programmed_only(OspreyConfig& config) {
 	ProgrammedProcessInfo programmed_info;
 
-	int trace_fd = open(config.trace_filepath.c_str(), O_RDONLY);
-	if (trace_fd == -1) {
-		std::string error_string = "open(" + config.trace_filepath + ", O_RDONLY)";
-		std::perror(error_string.c_str());
-		return EXIT_FAILURE;
-	}
-
-	programmed_info.exit_fd = eventfd(0, EFD_NONBLOCK);
-	if (programmed_info.exit_fd == -1) {
-		std::perror("eventfd");
-		return EXIT_FAILURE;
-	}
-
-	launch_programmed_process(programmed_info, config, trace_fd);
-
-	if (close(trace_fd) != 0) {
-		std::perror("close(trace_fd)");
-		return EXIT_FAILURE;
-	}
+	launch_programmed_process(programmed_info, config);
 
 	/* Reap the child. */
 	int child_status;
@@ -446,21 +345,11 @@ int speculative_and_programmed(OspreyConfig& config) {
 		speculative_overlay = osprey::util::Overlay::create_overlay();
 	}
 
-	launch_speculative_process(speculative_info, config, speculative_overlay.get(), -1);
-	launch_programmed_process(programmed_info, config, speculative_info.child_memprog_fd);
+	launch_speculative_process(speculative_info, config, speculative_overlay.get());
+	launch_programmed_process(programmed_info, config);
 
 	/* No more communication with the speculative child is necessary. */
 	close(speculative_info.child_comm_fd);
-
-	programmed_info.exit_fd = eventfd(0, EFD_NONBLOCK);
-	if (programmed_info.exit_fd == -1) {
-		std::perror("eventfd");
-		return EXIT_FAILURE;
-	}
-	if (close(speculative_info.child_memprog_fd) != 0) {
-		std::perror("close(memprog_fd)");
-		return EXIT_FAILURE;
-	}
 
 	/* Reap the programmed child. */
 	int child_status;
@@ -495,7 +384,7 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
         ("cleanup-only", po::bool_switch(&config.cleanup_overlays), "only clean up overlays")
         ("tracing-algorithm", po::value<std::string>(&config.tracing_algorithm)->default_value("MICROSET"), "algorithm to use for extracting the memory access pattern (MICROSET or FIFO)")
         ("window-size", po::value<std::size_t>(&config.window_size)->default_value(16384), "window size to use for tracing")
-        ("trace-file", po::value<std::string>(&config.trace_filepath), "write access pattern trace to file at specified path (if empty string, this is disabled)")
+        ("trace-filebase", po::value<std::string>(&config.trace_filebase), "write access pattern trace to file at specified path")
         ("trace-to-stdout", po::bool_switch(&config.trace_to_stdout), "write trace in human-readable form to stdout")
         ("programming-algorithm", po::value<std::string>(&config.programming_algorithm)->default_value("3PO"))
 		("mem-limit-low", po::value<std::size_t>(&config.mem_limit_low)->default_value(262144), "low memory limit for 3PO in kilobytes")
@@ -539,9 +428,16 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
 		return true;
 	}
 
-	if (config.programmed_only && config.trace_filepath.empty()) {
-		std::cout << "If --programmed-only is specified, then --trace-file is required" << std::endl;
-		return true;
+	if (config.trace_filebase.empty()) {
+		if (config.speculative_only || config.programmed_only) {
+			std::cout << "--trace-filebase is required" << std::endl;
+			return true;
+		}
+	} else {
+		if (!config.speculative_only && !config.programmed_only) {
+			std::cout << "--trace-filebase will be ignored if running together" << std::endl;
+			config.trace_filebase.clear();
+		}
 	}
 
 	if (config.tracing_algorithm != "MICROSET" && config.tracing_algorithm != "FIFO") {

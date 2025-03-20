@@ -188,15 +188,17 @@ void pmpspdz_matrix_multiply(
 }
 
 int main(int argc, char** argv) {
-	if (argc != 5) {
-		std::cout << "Usage: " << argv[0] << " [problem_name] [problem_size] [input_file] [output_file]" << std::endl;
+	if (argc != 6) {
+		std::cout << "Usage: " << argv[0] << " [problem_name] [problem_size] [thread_num] [input_file] [output_file]"
+				  << std::endl;
 		return 1;
 	}
 
 	char* problem_name = argv[1];
 	std::size_t problem_size = std::stoull(argv[2]);
-	char* input_file = argv[3];
-	char* output_file = argv[4];
+	std::size_t thread_num = std::stoull(argv[3]);
+	char* input_file = argv[4];
+	char* output_file = argv[5];
 
 	constexpr std::size_t bs = 4096;
 
@@ -221,11 +223,11 @@ int main(int argc, char** argv) {
 
 	std::vector<Ciphertext> output_data_encrypt;
 	if (strcmp(problem_name, "pmpspdz_matrix_multiply") == 0) {
-		pmpspdz_matrix_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, 16);
+		pmpspdz_matrix_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
 	} else if (strcmp(problem_name, "pmpspdz_vector_multiply") == 0) {
-		pmpspdz_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, 16);
+		pmpspdz_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
 	} else if (strcmp(problem_name, "pmpspdz_sum") == 0) {
-		pmpspdz_sum(problem_size, keypair, input_data_encrypt, output_data_encrypt, 16);
+		pmpspdz_sum(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
 	} else {
 		std::cerr << "Unknown problem name" << std::endl;
 		return 1;

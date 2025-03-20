@@ -49,6 +49,7 @@ $(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools
 		-I$(PROJECT_DIR)/install/oblivious-SEAL/include/SEAL-4.1 \
 		-I$(PROJECT_DIR)/mage/src \
 		-I$(PROJECT_DIR)/osprey \
+		-I$(PROJECT_DIR)/osprey/bin/include \
 		-I$(PROJECT_DIR)/install/relic/include \
 		-I$(PROJECT_DIR)/install/emp-tool/include \
 		-I$(PROJECT_DIR)/install/emp-ot/include \

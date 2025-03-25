@@ -26,7 +26,6 @@ $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib \
 		-Wl,-rpath,$(PROJECT_DIR)/osprey/bin \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/oblivious-SEAL/lib \
-		-Wl,-rpath,$(DEP_INSTALL_DIR)/relic/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/libOTe \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/MP-SPDZ \
@@ -35,7 +34,6 @@ $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools
 		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \
 		-L$(PROJECT_DIR)/osprey/bin -l:libosprey.so \
 		-L$(PROJECT_DIR)/install/oblivious-SEAL/lib -l:libseal.so.4.1.1 \
-		-L$(PROJECT_DIR)/install/relic/lib -l:librelic.so \
 		-L$(PROJECT_DIR)/install/emp-tool/lib -l:libemp-tool.so \
 		-L$(PROJECT_DIR)/install/libOTe/lib -l:libcryptoTools.a -l:liblibOTe.a \
 		-L$(PROJECT_DIR)/install/MP-SPDZ -l:libSPDZ.so -l:libFHE.so \
@@ -50,7 +48,6 @@ $(DEP_BUILD_DIR)/tools/%.o: $(PROJECT_DIR)/tools/%.cpp $(DEP_BUILD_DIR)/tools
 		-I$(PROJECT_DIR)/mage/src \
 		-I$(PROJECT_DIR)/osprey \
 		-I$(PROJECT_DIR)/osprey/bin/include \
-		-I$(PROJECT_DIR)/install/relic/include \
 		-I$(PROJECT_DIR)/install/emp-tool/include \
 		-I$(PROJECT_DIR)/install/emp-ot/include \
 		-I$(PROJECT_DIR)/install/emp-sh2pc/include \

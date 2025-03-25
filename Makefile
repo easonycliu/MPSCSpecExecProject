@@ -11,9 +11,9 @@ ifndef JOBS
 JOBS := $(shell nproc)
 endif
 
-.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ show
+.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ show
 
-all: yaml-cpp tfhe oblivious-SEAL osprey mage relic emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ tools
+all: yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ tools
 
 mage: yaml-cpp tfhe oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
@@ -24,7 +24,7 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 $(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
 	mkdir $@ || true
 
-tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage relic emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ
+tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ
 	make -C $(PROJECT_DIR)/tools -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
@@ -63,21 +63,9 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
-relic: $(DEP_INSTALL_DIR)/relic
-	cd $(PROJECT_DIR)/relic && \
-		cmake -B $(DEP_BUILD_DIR)/relic -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DCMAKE_C_COMPILER=gcc-9 -DFB_POLYN=251 && \
-		cmake --build $(DEP_BUILD_DIR)/relic -j$(JOBS) && \
-		cmake --install $(DEP_BUILD_DIR)/relic
-
-$(DEP_INSTALL_DIR)/relic: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/relic
-	mkdir $@ || true
-
-$(DEP_BUILD_DIR)/relic: $(DEP_BUILD_DIR)
-	mkdir $@ || true
-
-emp-tool: $(DEP_INSTALL_DIR)/emp-tool osprey relic
+emp-tool: $(DEP_INSTALL_DIR)/emp-tool osprey
 	cd $(PROJECT_DIR)/emp-tool && \
-		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DCMAKE_PREFIX_PATH=$(DEP_INSTALL_DIR)/relic && \
+		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
 		cmake --build $(DEP_BUILD_DIR)/emp-tool --verbose -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-tool
 
@@ -87,9 +75,9 @@ $(DEP_INSTALL_DIR)/emp-tool: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-tool
 $(DEP_BUILD_DIR)/emp-tool: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-emp-ot: $(DEP_INSTALL_DIR)/emp-ot osprey relic emp-tool
+emp-ot: $(DEP_INSTALL_DIR)/emp-ot osprey emp-tool
 	cd $(PROJECT_DIR)/emp-ot && \
-		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/relic;$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" && \
+		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" && \
 		cmake --build $(DEP_BUILD_DIR)/emp-ot -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-ot
 
@@ -99,11 +87,11 @@ $(DEP_INSTALL_DIR)/emp-ot: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-ot
 $(DEP_BUILD_DIR)/emp-ot: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc osprey relic emp-tool emp-ot
+emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc osprey emp-tool emp-ot
 	cd $(PROJECT_DIR)/emp-sh2pc && \
 		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc \
 		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ \
-		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/relic;$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
+		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
 		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc --verbose -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-sh2pc
 

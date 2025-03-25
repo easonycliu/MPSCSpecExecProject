@@ -25,9 +25,6 @@
 [submodule "emp-sh2pc"]
 	path = emp-sh2pc
 	url = git@github.com:easonycliu/MPSCSpecExecEMPSh2PC.git
-[submodule "relic"]
-	path = relic
-	url = git@github.com:easonycliu/MPSCSpecExecRelic.git
 [submodule "MP-SPDZ"]
 	path = MP-SPDZ
 	url = git@github.com:easonycliu/MPSCSpecExecMPSPDZ.git

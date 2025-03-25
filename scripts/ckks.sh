@@ -19,7 +19,7 @@ current_date=$(date +%Y%m%d)
 
 project_dir=$(git rev-parse --show-toplevel)
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
-playground_dir=${log_dir}
+# playground_dir=${log_dir}
 
 tool_cmd=
 log_file=/dev/null
@@ -107,10 +107,11 @@ if [ "${compile}" == "true" ]; then
 	popd
 fi
 
-if [ "${calculate_only}" == "true" ]; then
-	playground_dir=${project_dir}/logs/playground
-fi
+# if [ "${calculate_only}" == "true" ]; then
+# 	playground_dir=${project_dir}/logs/playground
+# fi
 
+playground_dir=${project_dir}/logs/playground
 mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
@@ -139,6 +140,7 @@ elif [ "${tool}" == "mage" ]; then
 	cat <<EOF >config.yaml
 page_shift: ${page_shift}
 num_pages: ${num_pages}
+round_num: ${round_num}
 prefetch_buffer_size: 16
 prefetch_lookahead: 100
 
@@ -158,10 +160,10 @@ fi
 $CKKS_UTILS decrypt_file 1 ${workload}_${input_size}_0_garbler.output
 echo real output is $(od -An -f ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
-if [ "${calculate_only}" != "true" ]; then
-	mkdir -p ${project_dir}/logs/playground
-	cp * ${project_dir}/logs/playground
-fi
+# if [ "${calculate_only}" != "true" ]; then
+# 	mkdir -p ${project_dir}/logs/playground
+# 	cp * ${project_dir}/logs/playground
+# fi
 
 popd
 

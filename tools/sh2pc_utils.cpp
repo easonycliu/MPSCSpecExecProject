@@ -169,7 +169,7 @@ void merge_sorted(
 		value.push_back(vitem);
 	}
 
-	bitonic_merge(key.data(), value.data(), 0, key.size(), true);
+	bitonic_merge(key.data(), value.data(), 0, key.size(), false);
 
 	for (std::size_t i = 0; i != key.size(); i++) {
 		output_data.push_back(key[i]);

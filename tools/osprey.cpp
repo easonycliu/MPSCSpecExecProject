@@ -110,8 +110,13 @@ void launch_speculative_process(
 			std::exit(EXIT_FAILURE);
 		}
 
-		if (!config.trace_filebase.empty()) {
-			if (setenv("OSPREY_TRACE_FILEBASE", config.trace_filebase.c_str(), 1) != 0) {
+		if (setenv("OSPREY_TRACE_FILEBASE", config.trace_filebase.c_str(), 1) != 0) {
+			std::perror("setenv");
+			std::exit(EXIT_FAILURE);
+		}
+
+		if (!config.speculative_only) {
+			if (setenv("OSPREY_USE_SHM", "", 1) != 0) {
 				std::perror("setenv");
 				std::exit(EXIT_FAILURE);
 			}
@@ -223,8 +228,13 @@ void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyCon
 			std::exit(EXIT_FAILURE);
 		}
 
-		if (!config.trace_filebase.empty()) {
-			if (setenv("OSPREY_TRACE_FILEBASE", config.trace_filebase.c_str(), 1) != 0) {
+		if (setenv("OSPREY_TRACE_FILEBASE", config.trace_filebase.c_str(), 1) != 0) {
+			std::perror("setenv");
+			std::exit(EXIT_FAILURE);
+		}
+
+		if (!config.programmed_only) {
+			if (setenv("OSPREY_USE_SHM", "", 1) != 0) {
 				std::perror("setenv");
 				std::exit(EXIT_FAILURE);
 			}
@@ -429,15 +439,8 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
 	}
 
 	if (config.trace_filebase.empty()) {
-		if (config.speculative_only || config.programmed_only) {
-			std::cout << "--trace-filebase is required" << std::endl;
-			return true;
-		}
-	} else {
-		if (!config.speculative_only && !config.programmed_only) {
-			std::cout << "--trace-filebase will be ignored if running together" << std::endl;
-			config.trace_filebase.clear();
-		}
+		std::cout << "--trace-filebase is required" << std::endl;
+		return true;
 	}
 
 	if (config.tracing_algorithm != "MICROSET" && config.tracing_algorithm != "FIFO") {

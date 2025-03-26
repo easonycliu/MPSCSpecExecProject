@@ -17,7 +17,7 @@ current_date=$(date +%Y%m%d)
 
 project_dir=$(git rev-parse --show-toplevel)
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
-playground_dir=${log_dir}
+playground_dir=${project_dir}/logs/playground
 
 tool_cmd=
 log_file=/dev/null
@@ -104,12 +104,12 @@ pushd ${playground_dir}
 
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
 
-echo expected output is $(od -An -l ${workload}_${input_size}_0.expected | tail -n 2)
+echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
 
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-${SUDO} ${tool_cmd} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output &
+${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output &
 sleep 1
-${SUDO} ${tool_cmd} ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 127.0.0.1 ${workload}_${input_size}_0_evaluator.input ${workload}_${input_size}_0_evaluator.output
+${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_evaluator ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 127.0.0.1 ${workload}_${input_size}_0_evaluator.input ${workload}_${input_size}_0_evaluator.output
 elif [ "${tool}" == "mage" ]; then
 	page_shift=21
 	num_pages=32768
@@ -144,7 +144,7 @@ EOF
 	$SUDO mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
 fi
 
-echo real output is $(od -An -l ${workload}_${input_size}_0_garbler.output | tail -n 2)
+echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd
 

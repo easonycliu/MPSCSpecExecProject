@@ -13,7 +13,38 @@
 #include "Math/bigint.h"
 #include "Math/modp.hpp"
 #include "Tools/random.h"
-#include "lib/mapreduce.hpp"
+
+class MapReduce {
+public:
+	template <typename InputType, typename OutputType>
+	static void
+	map(const std::vector<InputType>& input_data, std::vector<OutputType>& mapped_data,
+		std::function<OutputType(const InputType&)> map_func, std::size_t num_threads) {
+		std::vector<std::thread> threads;
+
+		for (std::size_t t = 0; t < num_threads; ++t) {
+			threads.emplace_back([&, t]() {
+				for (std::size_t i = t; i < input_data.size(); i += num_threads) {
+					mapped_data[i] = map_func(input_data[i]);
+				}
+			});
+		}
+
+		for (auto& thread : threads) {
+			thread.join();
+		}
+	}
+
+	template <typename OutputType>
+	static void reduce(
+		const std::vector<OutputType>& mapped_data, OutputType& result,
+		std::function<OutputType(const OutputType&, const OutputType&)> reduce_func
+	) {
+		for (std::size_t i = 0; i < mapped_data.size(); i++) {
+			result = reduce_func(result, mapped_data[i]);
+		}
+	}
+};
 
 Ciphertext to_ciphertext(FHE_KeyPair& keypair, int value) {
 	Plaintext_mod_prime plaintext(keypair.pk.get_params().get_plaintext_field_data<FFT_Data>());
@@ -96,7 +127,7 @@ void pmpspdz_sum(
 
 	std::vector<Ciphertext> partial_sums;
 	partial_sums.resize(chunks.size(), to_ciphertext(keypair, 0));
-	osprey::lib::MapReduce::map<std::vector<Ciphertext>, Ciphertext>(
+	MapReduce::map<std::vector<Ciphertext>, Ciphertext>(
 		chunks, partial_sums,
 		[](const std::vector<Ciphertext>& chunk) -> Ciphertext {
 			Ciphertext sum = chunk[0];
@@ -109,7 +140,7 @@ void pmpspdz_sum(
 	);
 
 	output_data.resize(1, to_ciphertext(keypair, 0));
-	osprey::lib::MapReduce::reduce<Ciphertext>(
+	MapReduce::reduce<Ciphertext>(
 		partial_sums, output_data[0],
 		[](const Ciphertext& a, const Ciphertext& b) -> Ciphertext {
 			return a + b;
@@ -134,7 +165,7 @@ void pmpspdz_vector_multiply(
 
 	std::vector<Ciphertext> products;
 	products.resize(paired_input.size(), to_ciphertext(keypair, 0));
-	osprey::lib::MapReduce::map<std::pair<Ciphertext, Ciphertext>, Ciphertext>(
+	MapReduce::map<std::pair<Ciphertext, Ciphertext>, Ciphertext>(
 		paired_input, products,
 		[&](const std::pair<Ciphertext, Ciphertext>& pair) -> Ciphertext {
 			return pair.first.mul(keypair.pk, pair.second);
@@ -143,12 +174,9 @@ void pmpspdz_vector_multiply(
 	);
 
 	output_data.resize(1, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
-	osprey::lib::MapReduce::reduce<Ciphertext>(
-		products, output_data[0],
-		[](const Ciphertext& a, const Ciphertext& b) -> Ciphertext {
-			return a + b;
-		}
-	);
+	MapReduce::reduce<Ciphertext>(products, output_data[0], [](const Ciphertext& a, const Ciphertext& b) -> Ciphertext {
+		return a + b;
+	});
 }
 
 // Matrix Multiplication Logic Using MapReduce
@@ -169,7 +197,7 @@ void pmpspdz_matrix_multiply(
 	}
 
 	output_data.resize(problem_size * problem_size, to_ciphertext(keypair, 0));
-	osprey::lib::MapReduce::map<std::pair<std::size_t, std::size_t>, Ciphertext>(
+	MapReduce::map<std::pair<std::size_t, std::size_t>, Ciphertext>(
 		tasks, output_data,
 		[&](const std::pair<std::size_t, std::size_t>& task) -> Ciphertext {
 			std::size_t i = task.first;

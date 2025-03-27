@@ -11,7 +11,7 @@ ifndef JOBS
 JOBS := $(shell nproc)
 endif
 
-.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ show
+.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ show fastsudo
 
 all: yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ tools
 
@@ -149,3 +149,42 @@ clean:
 	cd $(PROJECT_DIR)/MP-SPDZ && make clean PROJECT_DIR=$(PROJECT_DIR)
 	cd $(PROJECT_DIR) && rm -rf $(DEP_BUILD_DIR) && rm -rf $(DEP_INSTALL_DIR)
 
+FASTSUDO_SRC = \#include<grp.h>\n$\
+	  \#include<stdio.h>\n$\
+	  \#include<stdlib.h>\n$\
+	  \#include<string.h>\n$\
+	  \#include<sys/types.h>\n$\
+	  \#include<unistd.h>\n$\
+	  \n$\
+	  int main(int argc, char** argv) {\n$\
+	  	if (argc < 2) {\n$\
+	  		printf(\"Usage: \%s <command> [args...]\\\n\", argv[0]);\n$\
+	  		exit(1);\n$\
+	  	}\n$\
+	  	\n$\
+	  	gid_t groups[] = {0};\n$\
+	  	setuid(0);\n$\
+	  	setgid(0);\n$\
+	  	setgroups(1, groups);\n$\
+	  	\n$\
+	  	size_t arglen = 1;\n$\
+	  	for (int i = 1; i < argc; i++) {\n$\
+	  		arglen += strlen(argv[i]) + 1;\n$\
+	  	}\n$\
+	  	\n$\
+	  	char* cmd = (char*)malloc(arglen);\n$\
+	  	for (int i = 1; i < argc; i++) {\n$\
+	  		strcat(cmd, argv[i]);\n$\
+			strcat(cmd, \" \");\n$\
+	  	}\n$\
+	  	system(cmd);\n$\
+	  	\n$\
+	  	free(cmd);\n$\
+	  	return 0;\n$\
+	  }\n
+
+fastsudo:
+	@echo "$(FASTSUDO_SRC)" | gcc -x c -static -o fastsudo - && \
+		sudo chown root:root fastsudo && \
+		sudo chmod +s fastsudo && \
+		sudo mv -b --suffix=.bak fastsudo /usr/local/bin

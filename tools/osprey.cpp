@@ -356,6 +356,7 @@ int speculative_and_programmed(OspreyConfig& config) {
 	}
 
 	launch_speculative_process(speculative_info, config, speculative_overlay.get());
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	launch_programmed_process(programmed_info, config);
 
 	/* No more communication with the speculative child is necessary. */

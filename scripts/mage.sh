@@ -3,9 +3,6 @@
 tool=
 tool_args=
 
-compile=
-compile_flags=
-
 input_size=
 mem_limit=
 workload=
@@ -16,15 +13,14 @@ current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
 project_dir=$(git rev-parse --show-toplevel)
-log_dir=${project_dir}/logs/${current_date}/log_${current_time}
-playground_dir=${project_dir}/logs/playground
+log_dir=${project_dir}/logs/20250327/log_20250327_155316
+playground_dir=${log_dir}
 
 tool_cmd=
 log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
 MAGE=${project_dir}/install/tools/mage
-SH2PC_UTILS=${project_dir}/install/tools/sh2pc_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
 
@@ -41,13 +37,6 @@ for flag in "$@"; do
 		--tool_args=*)
 			value_index=$(( $(echo $flag | grep -bo = | awk -F : '{print $1}' | head -n 1) + 1 ))
 			tool_args=$(echo ${flag:$value_index})
-			;;
-		--compile=*)
-			compile=$(echo $flag | awk -F = '{print $2}')
-			;;
-		--compile_flags=*)
-			value_index=$(( $(echo $flag | grep -bo = | awk -F : '{print $1}' | head -n 1) + 1 ))
-			compile_flags=$(echo ${flag:$value_index})
 			;;
 		--input_size=*)
 			input_size=$(echo $flag | awk -F = '{print $2}')
@@ -75,10 +64,23 @@ echo Input size: ${input_size} | tee -a ${log_file}
 echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
+if [ "${mem_limit}" != "" ]; then
+	$SUDO cgcreate -g memory:/osprey
+	$SUDO cgset -r memory.high="${mem_limit}M" osprey
+	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
+fi
+
+page_shift=21
+num_pages=1048576
 if [ "${tool}" == "osprey" ]; then
 	tool_cmd="$OSPREY ${tool_args}"
 elif [ "${tool}" == "mage" ]; then
-	tool_cmd="$MAGE ${tool_args}"
+	tool_cmd=""
+	if [ "${mem_limit}" == "" ]; then
+		echo "Error: Memory limit is required for MAGE"
+		exit
+	fi
+	num_pages=$(( ( ( mem_limit << 20 ) >> page_shift ) - 48 ))
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
 else
@@ -86,37 +88,10 @@ else
 	exit
 fi
 
-if [ "${mem_limit}" != "" ]; then
-	$SUDO cgcreate -g memory:/osprey
-	$SUDO cgset -r memory.high="${mem_limit}M" osprey
-	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
-fi
-
-if [ "${compile}" == "true" ]; then
-	pushd ${project_dir}
-	make clean
-	make tools -j16
-	popd
-fi
-
 mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
-${EXAMPLE_INPUT} ${workload} ${input_size} 1
-
-echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
-
-if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output &
-sleep 1
-${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_evaluator ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 127.0.0.1 ${workload}_${input_size}_0_evaluator.input ${workload}_${input_size}_0_evaluator.output
-elif [ "${tool}" == "mage" ]; then
-	page_shift=21
-	num_pages=32768
-	if [ "${mem_limit}" != "" ]; then
-		num_pages=$(( ( ( mem_limit << 20 ) >> page_shift ) - 48 ))
-	fi
-	cat <<EOF >config.yaml
+cat <<EOF >config.yaml
 page_shift: ${page_shift}
 num_pages: ${num_pages}
 prefetch_buffer_size: 16
@@ -139,10 +114,24 @@ parties:
           external_port: 54322
           storage_path: garbler_swapfile_1
 EOF
-	$SUDO $PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
-	$SUDO ${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
-	$SUDO mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
+
+${EXAMPLE_INPUT} ${workload} ${input_size} 1
+
+echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
+
+$SUDO $PLANNER ${workload} halfgates config.yaml 0 0 ${input_size} | tee -a ${log_file}
+
+if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
+	${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_evaluator ${MAGE} halfgates config.yaml 0 0 ${workload}_${input_size} &
+	sleep 1
+	${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${MAGE} halfgates config.yaml 1 0 ${workload}_${input_size}
+elif [ "${tool}" == "mage" ]; then
+	$SUDO ${MAGE} halfgates config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file} &
+	sleep 1
+	$SUDO ${MAGE} halfgates config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}
 fi
+
+$SUDO mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
 
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 

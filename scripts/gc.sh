@@ -9,29 +9,27 @@ compile_flags=
 input_size=
 mem_limit=
 workload=
+this_ip=
+other_ip=
 
 batch_size=1
 
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
-project_dir=$(git rev-parse --show-toplevel)
+project_dir=/home/yicheng/MPSCSpecExecProject
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
-playground_dir=${project_dir}/logs/playground
+playground_dir=${project_dir}/install/tools
 
 tool_cmd=
+tool_args_garbler=
+tool_args_evaluator=
 log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
-MAGE=${project_dir}/install/tools/mage
 SH2PC_UTILS=${project_dir}/install/tools/sh2pc_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
-
-SUDO=
-if [ $(id -u) -ne 0 ]; then
-	SUDO=sudo
-fi
 
 for flag in "$@"; do
 	case $flag in
@@ -58,13 +56,19 @@ for flag in "$@"; do
 		--workload=*)
 			workload=$(echo $flag | awk -F = '{print $2}')
 			;;
+		--this_ip=*)
+			this_ip=$(echo $flag | awk -F = '{print $2}')
+			;;
+		--other_ip=*)
+			other_ip=$(echo $flag | awk -F = '{print $2}')
+			;;
 		*)
 			echo "Unknown command-line flag" $flag
 	esac
 done
 
-$SUDO sync
-echo 3 | $SUDO tee /proc/sys/vm/drop_caches
+sync
+echo 3 | tee /proc/sys/vm/drop_caches
 
 log_file=${log_dir}/${workload}.log
 mkdir -p ${log_dir}
@@ -76,19 +80,21 @@ echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then
-	tool_cmd="$OSPREY ${tool_args}"
-elif [ "${tool}" == "mage" ]; then
-	tool_cmd="$MAGE ${tool_args}"
+	tool_cmd="$OSPREY"
+	tool_args_garbler="${tool_args} --trace-filebase=${workload}_${input_size}_garbler"
+	tool_args_evaluator="${tool_args} --trace-filebase=${workload}_${input_size}_evaluator"
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
+	tool_args_garbler=""
+	tool_args_evaluator=""
 else
 	echo "Unknown tool" ${tool}
 	exit
 fi
 
 if [ "${mem_limit}" != "" ]; then
-	$SUDO cgcreate -g memory:/osprey
-	$SUDO cgset -r memory.high="${mem_limit}M" osprey
+	cgcreate -g memory:/osprey
+	cgset -r memory.high="${mem_limit}M" osprey
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -103,53 +109,22 @@ mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
 
-if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output &
+echo ${tool_cmd} ${tool_args_garbler} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
+${tool_cmd} ${tool_args_garbler} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output &
 sleep 1
-${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_evaluator ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 127.0.0.1 ${workload}_${input_size}_0_evaluator.input ${workload}_${input_size}_0_evaluator.output
-elif [ "${tool}" == "mage" ]; then
-	page_shift=21
-	num_pages=32768
-	if [ "${mem_limit}" != "" ]; then
-		num_pages=$(( ( ( mem_limit << 20 ) >> page_shift ) - 48 ))
-	fi
-	cat <<EOF >config.yaml
-page_shift: ${page_shift}
-num_pages: ${num_pages}
-prefetch_buffer_size: 16
-prefetch_lookahead: 100
-
-parties:
-    # Evaluator
-    - workers:
-        - internal_host: localhost
-          internal_port: 56000
-          external_host: localhost
-          external_port: 54323
-          storage_path: evaluator_swapfile_1
-
-    # Garbler
-    - workers:
-        - internal_host: localhost
-          internal_port: 50000
-          external_host: localhost
-          external_port: 54322
-          storage_path: garbler_swapfile_1
-EOF
-	$SUDO $PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
-	$SUDO ${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
-	$SUDO mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
-fi
+echo ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
 
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd
 
 if [ "${mem_limit}" != "" ]; then
-	$SUDO cgdelete memory:/osprey
+	cgdelete memory:/osprey
 fi
 
 stty sane

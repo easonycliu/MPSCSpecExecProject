@@ -64,12 +64,6 @@ echo Input size: ${input_size} | tee -a ${log_file}
 echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
-if [ "${mem_limit}" != "" ]; then
-	$SUDO cgcreate -g memory:/osprey
-	$SUDO cgset -r memory.high="${mem_limit}M" osprey
-	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
-fi
-
 page_shift=21
 num_pages=1048576
 if [ "${tool}" == "osprey" ]; then
@@ -86,6 +80,12 @@ elif [ "${tool}" == "baseline" ]; then
 else
 	echo "Unknown tool" ${tool}
 	exit
+fi
+
+if [ "${mem_limit}" != "" ]; then
+	$SUDO cgcreate -g memory:/osprey
+	$SUDO cgset -r memory.high="${mem_limit}M" osprey
+	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
 mkdir -p ${playground_dir}

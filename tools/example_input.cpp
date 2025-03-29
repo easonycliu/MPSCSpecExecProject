@@ -486,10 +486,8 @@ int main(int argc, char** argv) {
 			sum += i;
 			sum_squares += i * i;
 		}
-		float mean = (static_cast<float>(sum) / 100.0) / input_size;
-		float variance = ((static_cast<float>(sum_squares) / 10000.0) / input_size) - mean * mean;
-		expected_writers[0]->write_float(mean);
-		expected_writers[0]->write_float(variance);
+		expected_writers[0]->write_float(sum);
+		expected_writers[0]->write_float(sum_squares);
 	} else if (problem_name == "real_matrix_vector_multiply") {
 		if (option == "") {
 			for (std::uint64_t i = 0; i != input_size; i++) {

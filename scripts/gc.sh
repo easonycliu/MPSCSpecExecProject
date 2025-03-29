@@ -17,7 +17,7 @@ batch_size=1
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
-project_dir=/home/yicheng/MPSCSpecExecProject
+project_dir=$(realpath .)
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
 playground_dir=${project_dir}/install/tools
 

@@ -9,7 +9,6 @@ compile_flags=
 input_size=
 round_num=
 mem_limit=
-calculate_only=
 workload=
 
 batch_size=1
@@ -60,9 +59,6 @@ for flag in "$@"; do
 		--mem_limit=*)
 			mem_limit=$(echo $flag | awk -F = '{print $2}')
 			;;
-		--calculate_only)
-			calculate_only=true
-			;;
 		--workload=*)
 			workload=$(echo $flag | awk -F = '{print $2}')
 			;;
@@ -107,20 +103,9 @@ if [ "${compile}" == "true" ]; then
 	popd
 fi
 
-# if [ "${calculate_only}" == "true" ]; then
-# 	playground_dir=${project_dir}/logs/playground
-# fi
-
 playground_dir=${project_dir}/logs/playground
 mkdir -p ${playground_dir}
 pushd ${playground_dir}
-
-if [ "${calculate_only}" != "true" ]; then
-	$CKKS_UTILS keygen
-	$EXAMPLE_INPUT ${workload} ${input_size} 1 random
-	$CKKS_UTILS encrypt_file ${batch_size} 2 ${workload}_${input_size}_0_garbler.input
-	echo size is ${input_size}
-fi
 
 echo expected output is $(od -An -f ${workload}_${input_size}_0.expected | tail -n 2)
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
@@ -159,11 +144,6 @@ EOF
 fi
 $CKKS_UTILS decrypt_file 1 ${workload}_${input_size}_0_garbler.output
 echo real output is $(od -An -f ${workload}_${input_size}_0_garbler.output | tail -n 2)
-
-# if [ "${calculate_only}" != "true" ]; then
-# 	mkdir -p ${project_dir}/logs/playground
-# 	cp * ${project_dir}/logs/playground
-# fi
 
 popd
 

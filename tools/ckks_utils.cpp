@@ -37,28 +37,6 @@
 
 double ckks_scale = std::pow(2.0, 40);
 
-void check_num_args(int argc, int expected) {
-	if (argc != expected) {
-		std::cerr << "Need " << expected << " arguments" << std::endl;
-		std::abort();
-	}
-}
-
-seal::EncryptionParameters parms_from_file(const char* filename) {
-	seal::EncryptionParameters parms;
-	std::ifstream parms_file(filename, std::ios::binary);
-	parms.load(parms_file);
-	return parms;
-}
-
-template <typename T>
-T from_file(const seal::SEALContext& context, const char* filename) {
-	T t;
-	std::ifstream t_file(filename, std::ios::binary);
-	t.load(context, t_file);
-	return t;
-}
-
 template <std::size_t bs, typename T>
 bool read_from_file(const std::string& file, std::vector<T>& data) {
 	std::ifstream stream(file, std::ios::binary);
@@ -120,22 +98,12 @@ std::tuple<seal::EncryptionParameters, seal::SecretKey, seal::PublicKey, seal::R
 }
 
 template <std::size_t level, typename T>
-seal::Ciphertext to_ciphertext(seal::EncryptionParameters& parms, seal::PublicKey& public_key, const T& input) {
-	seal::SEALContext context(parms);
-	seal::Encryptor encryptor(context, public_key);
+seal::Ciphertext to_ciphertext(
+	std::shared_ptr<const seal::SEALContext::ContextData>& context_data, seal::Encryptor& encryptor,
+	seal::CKKSEncoder& encoder, const T& input
+) {
+	seal::parms_id_type target_level_parms_id = context_data->parms_id();
 
-	auto context_data = context.first_context_data();
-	while (context_data->chain_index() > level) {
-		context_data = context_data->next_context_data();
-	}
-	if (context_data->chain_index() != level) {
-		std::cout << "Could not find params for level " << level << " (max level is "
-				  << context.first_context_data()->chain_index() << ")" << std::endl;
-		std::abort();
-	}
-	auto target_level_parms_id = context_data->parms_id();
-
-	seal::CKKSEncoder encoder(context);
 	seal::Plaintext plaintext;
 	encoder.encode(input, target_level_parms_id, ckks_scale, plaintext);
 
@@ -145,11 +113,7 @@ seal::Ciphertext to_ciphertext(seal::EncryptionParameters& parms, seal::PublicKe
 }
 
 template <std::size_t level, typename T>
-T from_ciphertext(seal::EncryptionParameters& parms, seal::SecretKey& secret_key, const seal::Ciphertext& input) {
-	seal::SEALContext context(parms);
-	seal::Decryptor decryptor(context, secret_key);
-
-	seal::CKKSEncoder encoder(context);
+T from_ciphertext(seal::Decryptor& decryptor, seal::CKKSEncoder& encoder, const seal::Ciphertext& input) {
 	seal::Plaintext plaintext;
 	decryptor.decrypt(input, plaintext);
 
@@ -166,26 +130,19 @@ void encrypt_file(
 	seal::SEALContext context(parms);
 	seal::Encryptor encryptor(context, public_key);
 
-	auto context_data = context.first_context_data();
+	seal::CKKSEncoder encoder(context);
+
+	std::shared_ptr<const seal::SEALContext::ContextData> context_data = context.first_context_data();
 	while (context_data->chain_index() > level) {
 		context_data = context_data->next_context_data();
 	}
 	if (context_data->chain_index() != level) {
-		std::cout << "Could not find params for level " << level << " (max level is "
-				  << context.first_context_data()->chain_index() << ")" << std::endl;
+		std::cout << "Could not find params for level " << level << std::endl;
 		std::abort();
 	}
-	auto target_level_parms_id = context_data->parms_id();
-
-	seal::CKKSEncoder encoder(context);
 
 	for (const T& item : input_data) {
-		seal::Plaintext plaintext;
-		encoder.encode(item, target_level_parms_id, ckks_scale, plaintext);
-
-		seal::Ciphertext ciphertext;
-		encryptor.encrypt(plaintext, ciphertext);
-		output_data.push_back(ciphertext);
+		output_data.push_back(to_ciphertext<level>(context_data, encryptor, encoder, item));
 	}
 }
 
@@ -199,15 +156,8 @@ void decrypt_file(
 
 	seal::CKKSEncoder encoder(context);
 
-	output_data.clear();
-
 	for (const seal::Ciphertext& item : input_data) {
-		seal::Plaintext plaintext;
-		decryptor.decrypt(item, plaintext);
-
-		std::vector<T> value;
-		encoder.decode(plaintext, value);
-		output_data.push_back(value[0]);
+		output_data.push_back(from_ciphertext<0, T>(decryptor, encoder, item));
 	}
 }
 

@@ -464,64 +464,64 @@ int main(int argc, char** argv) {
 		std::size_t output_index = 3;
 		for (std::size_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-			garbler_writers[w]->write_float(i == output_index ? 1.0 : 0.0);
+			garbler_writers[w]->write_double(i == output_index ? 1.0 : 0.0);
 		}
 		for (std::size_t i = 0; i != input_size; i++) {
-			expected_writers[0]->write_float(static_cast<float>(1 + (i * input_size) + output_index));
+			expected_writers[0]->write_double(static_cast<double>(1 + (i * input_size) + output_index));
 		}
 	} else if (problem_name == "real_sum") {
 		std::size_t sum = 0;
 		for (std::size_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-			garbler_writers[w]->write_float(static_cast<float>(i) / 100.0);
+			garbler_writers[w]->write_double(static_cast<double>(i) / 100.0);
 			sum += i;
 		}
-		expected_writers[0]->write_float(static_cast<float>(sum) / 100.0);
+		expected_writers[0]->write_double(static_cast<double>(sum) / 100.0);
 	} else if (problem_name == "real_statistics") {
 		std::size_t sum = 0;
 		std::size_t sum_squares = 0;
 		for (std::size_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-			garbler_writers[w]->write_float(static_cast<float>(i) / 100.0);
+			garbler_writers[w]->write_double(static_cast<double>(i) / 100.0);
 			sum += i;
 			sum_squares += i * i;
 		}
-		expected_writers[0]->write_float(sum);
-		expected_writers[0]->write_float(sum_squares);
+		expected_writers[0]->write_double(sum);
+		expected_writers[0]->write_double(sum_squares);
 	} else if (problem_name == "real_matrix_vector_multiply") {
 		if (option == "") {
 			for (std::uint64_t i = 0; i != input_size; i++) {
 				std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-				float elem = i / 100.0;
-				garbler_writers[w]->write_float(elem);
-				expected_writers[w]->write_float(elem);
+				double elem = i / 100.0;
+				garbler_writers[w]->write_double(elem);
+				expected_writers[w]->write_double(elem);
 			}
 			for (std::uint64_t i = 0; i != input_size; i++) {
 				std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
 				for (std::uint64_t j = 0; j != input_size; j++) {
-					float elem = (i == j) ? 1.0 : 0.0;
+					double elem = (i == j) ? 1.0 : 0.0;
 					/* Identity matrix. */
-					garbler_writers[w]->write_float(elem);
+					garbler_writers[w]->write_double(elem);
 				}
 			}
 		} else if (option == "random") {
 			std::default_random_engine generator;
 			std::uniform_int_distribution<std::uint8_t> distribution(0, UINT8_MAX);
-			std::vector<float> vector(input_size);
+			std::vector<double> vector(input_size);
 			for (std::size_t i = 0; i != input_size; i++) {
 				std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
 				vector[i] = distribution(generator) / 100.0;
-				garbler_writers[w]->write_float(vector[i]);
+				garbler_writers[w]->write_double(vector[i]);
 			}
 			for (std::size_t i = 0; i != input_size; i++) {
 				std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-				float expected_elem = 0;
+				double expected_elem = 0;
 				for (std::size_t j = 0; j != input_size; j++) {
-					float matrix_elem = distribution(generator) / 100.0;
-					garbler_writers[w]->write_float(matrix_elem);
+					double matrix_elem = distribution(generator) / 100.0;
+					garbler_writers[w]->write_double(matrix_elem);
 					expected_elem += matrix_elem * vector[j];
 				}
-				expected_writers[w]->write_float(expected_elem);
+				expected_writers[w]->write_double(expected_elem);
 			}
 		} else {
 			std::cerr << "Unknown option " << option << std::endl;
@@ -539,44 +539,44 @@ int main(int argc, char** argv) {
 		if (option == "") {
 			for (std::uint64_t i = 0; i != input_size; i++) {
 				for (std::uint64_t j = 0; j != input_size; j++) {
-					float elem = (i == j) ? 1.0 : 0.0;
+					double elem = (i == j) ? 1.0 : 0.0;
 					/* Identity matrix, so we don't have to worry about row-major vs. column major --- both are
 					 * identical. */
 					garbler_writers[get_blocked_worker(i * input_size + j, num_workers, input_size * input_size)]
-						->write_float(elem);
+						->write_double(elem);
 
 					/* Write to row i, col j of expected matrix. */
 					std::uint32_t a_portion = i / portion_size_a;
 					std::uint32_t b_portion = j / portion_size_b;
-					expected_writers[a_portion * num_portions_b + b_portion]->write_float(elem);
+					expected_writers[a_portion * num_portions_b + b_portion]->write_double(elem);
 				}
 			}
 
 			for (std::uint64_t i = 0; i != input_size; i++) {
 				for (std::uint64_t j = 0; j != input_size; j++) {
-					float elem = (i == j) ? 1.0 : 0.0;
+					double elem = (i == j) ? 1.0 : 0.0;
 					/* Identity matrix, so we don't have to worry about row-major vs. column major --- both are
 					 * identical. */
 					garbler_writers[get_blocked_worker(i * input_size + j, num_workers, input_size * input_size)]
-						->write_float(elem);
+						->write_double(elem);
 				}
 			}
 		} else if (option == "random") {
 			std::default_random_engine generator;
 			std::uniform_int_distribution<std::uint8_t> distribution(0, UINT8_MAX);
-			std::vector<float> a(input_size * input_size);
+			std::vector<double> a(input_size * input_size);
 			for (std::size_t i = 0; i != a.size(); i++) {
 				a[i] = distribution(generator) / 100.0;
-				garbler_writers[get_blocked_worker(i, num_workers, a.size())]->write_float(a[i]);
+				garbler_writers[get_blocked_worker(i, num_workers, a.size())]->write_double(a[i]);
 			}
-			std::vector<float> b(input_size * input_size);
+			std::vector<double> b(input_size * input_size);
 			for (std::size_t i = 0; i != b.size(); i++) {
 				b[i] = distribution(generator) / 100.0;
-				garbler_writers[get_blocked_worker(i, num_workers, b.size())]->write_float(b[i]);
+				garbler_writers[get_blocked_worker(i, num_workers, b.size())]->write_double(b[i]);
 			}
 			for (std::size_t i = 0; i != input_size; i++) {
 				for (std::size_t j = 0; j != input_size; j++) {
-					float elem = 0.0;
+					double elem = 0.0;
 					for (std::size_t k = 0; k != input_size; k++) {
 						elem += a[i * input_size + k] * b[j * input_size + k];
 					}
@@ -584,7 +584,7 @@ int main(int argc, char** argv) {
 					/* Write to row i, col j of expected matrix. */
 					std::uint32_t a_portion = i / portion_size_a;
 					std::uint32_t b_portion = j / portion_size_b;
-					expected_writers[a_portion * num_portions_b + b_portion]->write_float(elem);
+					expected_writers[a_portion * num_portions_b + b_portion]->write_double(elem);
 				}
 			}
 		} else {
@@ -633,7 +633,7 @@ int main(int argc, char** argv) {
 
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			for (std::uint64_t j = 0; j != input_size; j++) {
-				float elem = (i == j) ? 1.0 : 0.0;
+				std::uint32_t elem = (i == j) ? 1 : 0;
 				/* Identity matrix, so we don't have to worry about row-major vs. column major --- both are
 				 * identical. */
 				garbler_writers[get_blocked_worker(i * input_size + j, num_workers, input_size * input_size)]->write32(
@@ -649,7 +649,7 @@ int main(int argc, char** argv) {
 
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			for (std::uint64_t j = 0; j != input_size; j++) {
-				float elem = (i == j) ? 1.0 : 0.0;
+				std::uint32_t elem = (i == j) ? 1 : 0;
 				/* Identity matrix, so we don't have to worry about row-major vs. column major --- both are
 				 * identical. */
 				garbler_writers[get_blocked_worker(i * input_size + j, num_workers, input_size * input_size)]->write32(

@@ -179,7 +179,6 @@ void real_sum(
 	std::chrono::system_clock::time_point calc_start_time = std::chrono::system_clock::now();
 	for (std::size_t i = 0; i != round_num; i++) {
 		for (std::size_t j = 0; j != problem_size; j++) {
-			std::cout << "Adding " << j << std::endl;
 			evaluator.add_inplace(sum, input_data[j]);
 		}
 	}
@@ -385,7 +384,7 @@ int main(int argc, char** argv) {
 	std::tuple<seal::EncryptionParameters, seal::SecretKey, seal::PublicKey, seal::RelinKeys, seal::GaloisKeys>
 		keypair = keygen();
 
-	std::vector<float> input_data;
+	std::vector<double> input_data;
 	read_from_file<bs>(input_file, input_data);
 
 	std::vector<seal::Ciphertext> input_data_encrypt;

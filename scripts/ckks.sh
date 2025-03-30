@@ -80,11 +80,14 @@ echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then
-	tool_cmd="$OSPREY ${tool_args}"
+	tool_cmd="$OSPREY"
+	tool_args="${tool_args} --trace-filebase=${workload}_${input_size}"
 elif [ "${tool}" == "mage" ]; then
-	tool_cmd="$MAGE ${tool_args}"
+	tool_cmd="$MAGE"
+	tool_args=""
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
+	tool_args=""
 else
 	echo "Unknown tool" ${tool}
 	exit
@@ -114,7 +117,7 @@ if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
 	# echo nop | $SUDO tee /sys/kernel/tracing/current_tracer
 	# echo 1 | $SUDO tee /sys/kernel/tracing/events/tlb/tlb_flush/enable
 	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
-	$SUDO ${tool_cmd} --trace-filebase=${workload}_${input_size} $CKKS_UTILS ${workload} $input_size ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
+	$SUDO ${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${input_size}:${round_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
 	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
 elif [ "${tool}" == "mage" ]; then
 	page_shift=21
@@ -125,7 +128,7 @@ elif [ "${tool}" == "mage" ]; then
 	cat <<EOF >config.yaml
 page_shift: ${page_shift}
 num_pages: ${num_pages}
-round_num: 1
+round_num: ${round_num}
 prefetch_buffer_size: 16
 prefetch_lookahead: 100
 

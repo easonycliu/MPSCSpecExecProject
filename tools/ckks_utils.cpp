@@ -168,8 +168,6 @@ void real_sum(
 	seal::SEALContext context(parms);
 	seal::Evaluator evaluator(context);
 
-	std::cout << "Starting loading ciphertext" << std::endl;
-
 	output_data.clear();
 	output_data.resize(1);
 
@@ -189,8 +187,6 @@ void real_statistics(
 ) {
 	seal::SEALContext context(parms);
 	seal::Evaluator evaluator(context);
-
-	std::cout << "Starting loading ciphertext" << std::endl;
 
 	output_data.clear();
 	output_data.resize(2);
@@ -226,8 +222,6 @@ void real_matrix_vector_multiply(
 	seal::SEALContext context(parms);
 	seal::Evaluator evaluator(context);
 
-	std::cout << "Starting loading ciphertext" << std::endl;
-
 	output_data.clear();
 	output_data.resize(problem_size);
 
@@ -252,8 +246,6 @@ void real_naive_matrix_multiply(
 ) {
 	seal::SEALContext context(parms);
 	seal::Evaluator evaluator(context);
-
-	std::cout << "Starting loading ciphertext" << std::endl;
 
 	output_data.clear();
 	output_data.resize(problem_size * problem_size);
@@ -287,8 +279,6 @@ void real_tiled_matrix_multiply(
 	seal::SEALContext context(parms);
 	seal::Evaluator evaluator(context);
 
-	std::cout << "Starting loading ciphertext" << std::endl;
-
 	output_data.clear();
 	output_data.resize(problem_size * problem_size);
 
@@ -297,8 +287,7 @@ void real_tiled_matrix_multiply(
 		input_data.data() + problem_size * problem_size, problem_size * problem_size
 	);
 
-	std::size_t memory_size =
-		(std::getenv("OSPREY_MEM_LIMIT_HIGH") ? std::stoull(std::getenv("OSPREY_MEM_LIMIT_HIGH")) : 1024 * 1024) * 1024;
+	std::size_t memory_size = 1024 * 1024 * 1024;
 	std::size_t tile_size = std::max(((std::size_t) std::sqrt(memory_size)) / 2048, 1ul);
 
 	for (std::size_t batch_row_a = 0; batch_row_a < problem_size; batch_row_a += tile_size) {
@@ -347,9 +336,12 @@ int main(int argc, char** argv) {
 	constexpr std::size_t bs = 4096;
 
 	std::string problem_name = argv[1];
-	std::size_t problem_size = std::stoull(argv[2]);
+	std::string problem_size_str = argv[2];
 	std::string input_file = argv[3];
 	std::string output_file = argv[4];
+
+	std::size_t problem_size = std::stoull(problem_size_str.substr(0, problem_size_str.find_first_of(':')));
+	std::size_t round_num = std::stoull(problem_size_str.substr(problem_size_str.find_first_of(':') + 1));
 
 	std::tuple<seal::EncryptionParameters, seal::SecretKey, seal::PublicKey, seal::RelinKeys, seal::GaloisKeys>
 		keypair = keygen();
@@ -359,7 +351,7 @@ int main(int argc, char** argv) {
 
 	std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
 	std::vector<seal::Ciphertext> input_data_encrypt;
-	encrypt_file<1>(std::get<0>(keypair), std::get<2>(keypair), input_data, input_data_encrypt);
+	encrypt_file<2>(std::get<0>(keypair), std::get<2>(keypair), input_data, input_data_encrypt);
 	std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
 	std::cout << "Encrypt time: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
@@ -367,10 +359,12 @@ int main(int argc, char** argv) {
 
 	std::vector<seal::Ciphertext> output_data_encrypt;
 	if (problem_name == "real_sum") {
-		real_sum(std::get<0>(keypair), std::get<3>(keypair), problem_size, 1, input_data_encrypt, output_data_encrypt);
+		real_sum(
+			std::get<0>(keypair), std::get<3>(keypair), problem_size, round_num, input_data_encrypt, output_data_encrypt
+		);
 	} else if (problem_name == "real_statistics") {
 		real_statistics(
-			std::get<0>(keypair), std::get<3>(keypair), problem_size, 1, input_data_encrypt, output_data_encrypt
+			std::get<0>(keypair), std::get<3>(keypair), problem_size, round_num, input_data_encrypt, output_data_encrypt
 		);
 	} else if (problem_name == "real_matrix_vector_multiply") {
 		real_matrix_vector_multiply(

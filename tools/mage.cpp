@@ -41,6 +41,8 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;
 	}
 
+	std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+
 	/* Parse the protocol name. */
 
 	std::string protocol_name(argv[1]);
@@ -96,6 +98,10 @@ int main(int argc, char** argv) {
 
 	const RegisteredProtocol& protocol = *prot_ptr;
 	protocol(args);
+
+	std::chrono::time_point<std::chrono::steady_clock> end = std::chrono::steady_clock::now();
+	std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms"
+			  << std::endl;
 
 	return EXIT_SUCCESS;
 }

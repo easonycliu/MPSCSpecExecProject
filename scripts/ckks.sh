@@ -18,7 +18,7 @@ current_date=$(date +%Y%m%d)
 
 project_dir=$(git rev-parse --show-toplevel)
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
-# playground_dir=${log_dir}
+playground_dir=${project_dir}/logs/playground
 
 tool_cmd=
 log_file=/dev/null
@@ -103,18 +103,18 @@ if [ "${compile}" == "true" ]; then
 	popd
 fi
 
-playground_dir=${project_dir}/logs/playground
 mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
-echo expected output is $(od -An -f ${workload}_${input_size}_0.expected | tail -n 2)
+$EXAMPLE_INPUT ${workload} ${input_size} 1 random
+
+echo expected output is $(od -An -t fD ${workload}_${input_size}_0.expected | tail -n 2)
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
 	# echo 0 | $SUDO tee /sys/kernel/tracing/trace
 	# echo nop | $SUDO tee /sys/kernel/tracing/current_tracer
 	# echo 1 | $SUDO tee /sys/kernel/tracing/events/tlb/tlb_flush/enable
 	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
-	$SUDO ${tool_cmd} \
-		$CKKS_UTILS ${workload} $(( input_size / batch_size )) $round_num ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
+	$SUDO ${tool_cmd} --trace-filebase=${workload}_${input_size} $CKKS_UTILS ${workload} $input_size ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
 	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
 elif [ "${tool}" == "mage" ]; then
 	page_shift=21
@@ -125,7 +125,7 @@ elif [ "${tool}" == "mage" ]; then
 	cat <<EOF >config.yaml
 page_shift: ${page_shift}
 num_pages: ${num_pages}
-round_num: ${round_num}
+round_num: 1
 prefetch_buffer_size: 16
 prefetch_lookahead: 100
 
@@ -140,10 +140,8 @@ parties:
 EOF
 	$SUDO $PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
 	$SUDO ${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
-	$SUDO mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
 fi
-$CKKS_UTILS decrypt_file 1 ${workload}_${input_size}_0_garbler.output
-echo real output is $(od -An -f ${workload}_${input_size}_0_garbler.output | tail -n 2)
+echo real output is $(od -An -t fD ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd
 

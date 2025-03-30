@@ -176,17 +176,11 @@ void real_sum(
 	seal::Ciphertext& sum = output_data[0];
 	sum = input_data[0];
 
-	std::chrono::system_clock::time_point calc_start_time = std::chrono::system_clock::now();
 	for (std::size_t i = 0; i != round_num; i++) {
 		for (std::size_t j = 0; j != problem_size; j++) {
 			evaluator.add_inplace(sum, input_data[j]);
 		}
 	}
-	std::chrono::system_clock::time_point calc_end_time = std::chrono::system_clock::now();
-	std::cout << "Finished calculating" << std::endl;
-	std::cout << "Time taken to calculate is "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end_time - calc_start_time).count() << " ms"
-			  << std::endl;
 }
 
 void real_statistics(
@@ -211,7 +205,6 @@ void real_statistics(
 	evaluator.square(input_data[0], sum_squares);
 	evaluator.square(input_data[0], temp_square);
 
-	std::chrono::system_clock::time_point calc_start_time = std::chrono::system_clock::now();
 	for (std::size_t i = 0; i != round_num; i++) {
 		for (std::size_t j = 0; j != problem_size; j++) {
 			evaluator.add_inplace(sum, input_data[j]);
@@ -221,14 +214,9 @@ void real_statistics(
 			evaluator.add_inplace(sum_squares, squared_points[j]);
 		}
 	}
-	std::chrono::system_clock::time_point calc_end_time = std::chrono::system_clock::now();
 
 	evaluator.sub_inplace(sum_squares, temp_square);
 	evaluator.sub_inplace(sum, input_data[0]);
-	std::cout << "Finished calculating" << std::endl;
-	std::cout << "Time taken to calculate is "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end_time - calc_start_time).count() << " ms"
-			  << std::endl;
 }
 
 void real_matrix_vector_multiply(
@@ -248,7 +236,6 @@ void real_matrix_vector_multiply(
 		input_data.data() + problem_size, problem_size * problem_size
 	);
 
-	std::chrono::system_clock::time_point calc_start_time = std::chrono::system_clock::now();
 	for (std::size_t i = 0; i != problem_size; i++) {
 		evaluator.multiply(input_points_matrix[i * problem_size], input_points_vector[0], output_data[i]);
 		for (std::size_t j = 1; j != problem_size; j++) {
@@ -257,11 +244,6 @@ void real_matrix_vector_multiply(
 			evaluator.add_inplace(output_data[i], temp);
 		}
 	}
-	std::chrono::system_clock::time_point calc_end_time = std::chrono::system_clock::now();
-	std::cout << "Finished calculating" << std::endl;
-	std::cout << "Time taken to calculate is "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end_time - calc_start_time).count() << " ms"
-			  << std::endl;
 }
 
 void real_naive_matrix_multiply(
@@ -281,7 +263,6 @@ void real_naive_matrix_multiply(
 		input_data.data() + problem_size * problem_size, problem_size * problem_size
 	);
 
-	std::chrono::system_clock::time_point calc_start_time = std::chrono::system_clock::now();
 	for (std::size_t row_a = 0; row_a != problem_size; row_a++) {
 		for (std::size_t col_b = 0; col_b != problem_size; col_b++) {
 			evaluator.multiply(
@@ -297,11 +278,6 @@ void real_naive_matrix_multiply(
 			}
 		}
 	}
-	std::chrono::system_clock::time_point calc_end_time = std::chrono::system_clock::now();
-	std::cout << "Finished calculating" << std::endl;
-	std::cout << "Time taken to calculate is "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end_time - calc_start_time).count() << " ms"
-			  << std::endl;
 }
 
 void real_tiled_matrix_multiply(
@@ -325,7 +301,6 @@ void real_tiled_matrix_multiply(
 		(std::getenv("OSPREY_MEM_LIMIT_HIGH") ? std::stoull(std::getenv("OSPREY_MEM_LIMIT_HIGH")) : 1024 * 1024) * 1024;
 	std::size_t tile_size = std::max(((std::size_t) std::sqrt(memory_size)) / 2048, 1ul);
 
-	std::chrono::system_clock::time_point calc_start_time = std::chrono::system_clock::now();
 	for (std::size_t batch_row_a = 0; batch_row_a < problem_size; batch_row_a += tile_size) {
 		for (std::size_t batch_col_b = 0; batch_col_b < problem_size; batch_col_b += tile_size) {
 			for (std::size_t batch_cols_a_rows_b = 0; batch_cols_a_rows_b < problem_size;
@@ -361,11 +336,6 @@ void real_tiled_matrix_multiply(
 			}
 		}
 	}
-	std::chrono::system_clock::time_point calc_end_time = std::chrono::system_clock::now();
-	std::cout << "Finished calculating" << std::endl;
-	std::cout << "Time taken to calculate is "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end_time - calc_start_time).count() << " ms"
-			  << std::endl;
 }
 
 int main(int argc, char** argv) {
@@ -387,8 +357,13 @@ int main(int argc, char** argv) {
 	std::vector<double> input_data;
 	read_from_file<bs>(input_file, input_data);
 
+	std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
 	std::vector<seal::Ciphertext> input_data_encrypt;
 	encrypt_file<1>(std::get<0>(keypair), std::get<2>(keypair), input_data, input_data_encrypt);
+	std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
+	std::cout << "Encrypt time: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
+			  << std::endl;
 
 	std::vector<seal::Ciphertext> output_data_encrypt;
 	if (problem_name == "real_sum") {
@@ -414,8 +389,20 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	std::chrono::high_resolution_clock::time_point calc_end = std::chrono::high_resolution_clock::now();
+	std::cout << "Calc time: " << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end - encrypt_end).count()
+			  << " ms" << std::endl;
+
 	std::vector<double> output_data;
 	decrypt_file(std::get<0>(keypair), std::get<1>(keypair), output_data_encrypt, output_data);
+	std::chrono::high_resolution_clock::time_point decrypt_end = std::chrono::high_resolution_clock::now();
+	std::cout << "Decrypt time: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - calc_end).count() << " ms"
+			  << std::endl;
+
+	std::cout << "Total time: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - encrypt_start).count() << " ms"
+			  << std::endl;
 
 	write_to_file<bs>(output_file, output_data);
 

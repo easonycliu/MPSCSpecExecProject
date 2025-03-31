@@ -86,7 +86,7 @@ pushd ${playground_dir}
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
-${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${MPSPDZ_UTILS} ${workload} ${input_size} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
+${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${MPSPDZ_UTILS} ${workload} ${input_size} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output | tee -a ${log_file}
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd

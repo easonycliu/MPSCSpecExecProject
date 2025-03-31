@@ -15,8 +15,8 @@ current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
 project_dir=$(realpath .)
-log_dir=${project_dir}/install/tools
-playground_dir=${log_dir}
+log_dir=${project_dir}/logs/${current_date}/log_${current_time}
+playground_dir=${project_dir}/logs/playground
 
 echo $project_dir
 
@@ -69,19 +69,26 @@ echo Input size: ${input_size} | tee -a ${log_file}
 echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
-page_shift=21
+page_shift=17
 num_pages=1048576
+tool_args_garbler=${tool_args}
+tool_args_evaluator=${tool_args}
 if [ "${tool}" == "osprey" ]; then
-	tool_cmd="$OSPREY ${tool_args}"
+	tool_cmd="$OSPREY"
+	tool_args_garbler="${tool_args} --trace-filebase=${workload}_${input_size}_garbler"
+	tool_args_evaluator="${tool_args} --trace-filebase=${workload}_${input_size}_evaluator"
+	mem_limit=""
 elif [ "${tool}" == "mage" ]; then
 	tool_cmd=""
 	if [ "${mem_limit}" == "" ]; then
 		echo "Error: Memory limit is required for MAGE"
 		exit
 	fi
-	num_pages=$(( ( ( mem_limit << 20 ) >> page_shift ) - 48 ))
+	num_pages=$(( ( ( mem_limit << 16 ) >> page_shift ) - 48 ))
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
+	tool_args_garbler=""
+	tool_args_evaluator=""
 else
 	echo "Unknown tool" ${tool}
 	exit
@@ -89,7 +96,9 @@ fi
 
 if [ "${mem_limit}" != "" ]; then
 	cgcreate -g memory:/osprey
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgcreate -g memory:/osprey"
 	cgset -r memory.high="${mem_limit}M" osprey
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgset -r memory.high=${mem_limit}M osprey"
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -127,17 +136,17 @@ ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${EX
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
 
-$PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size} | tee -a ${log_file}
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size}"
+$PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size} | tee -a ${log_file}.evaluator
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size}" | tee -a ${log_file}.garbler
 
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${tool_cmd} --trace-filebase=${workload}_${input_size}_evaluator ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" &
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; fastsudo ${tool_cmd} ${tool_args_evaluator} ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
 	sleep 1
-	${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size}
+	${tool_cmd} ${tool_args_garbler} ${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}.garbler
 elif [ "${tool}" == "mage" ]; then
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" &
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; fastsudo ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
 	sleep 1
-	${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}
+	${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}.garbler
 fi
 
 mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
@@ -148,6 +157,7 @@ popd
 
 if [ "${mem_limit}" != "" ]; then
 	cgdelete memory:/osprey
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgdelete memory:/osprey"
 fi
 
 stty sane

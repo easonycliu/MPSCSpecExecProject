@@ -117,6 +117,36 @@ void mpspdz_matrix_multiply(
 	}
 }
 
+void mpspdz_matrix_vector_multiply(
+	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
+	std::vector<Ciphertext>& output_data
+) {
+	if (input_data.size() != problem_size * problem_size + problem_size) {
+		std::cerr << "Input data size does not match problem size" << std::endl;
+		std::abort();
+	}
+
+	std::vector<Ciphertext> vector;
+	std::vector<std::vector<Ciphertext>> matrix(problem_size, std::vector<Ciphertext>());
+	for (std::size_t i = 0; i < problem_size; i++) {
+		vector.push_back(input_data[i]);
+	}
+	for (std::size_t i = 0; i < problem_size; i++) {
+		for (std::size_t j = 0; j < problem_size; j++) {
+			matrix[i].push_back(input_data[problem_size + i * problem_size + j]);
+		}
+	}
+
+	output_data.clear();
+	output_data.reserve(problem_size);
+	for (std::size_t i = 0; i < problem_size; i++) {
+		output_data.push_back(matrix[i][0].mul(keypair.pk, vector[0]));
+		for (std::size_t j = 1; j < problem_size; j++) {
+			output_data[i] += matrix[i][j].mul(keypair.pk, vector[j]);
+		}
+	}
+}
+
 int main(int argc, char** argv) {
 	if (argc != 5) {
 		std::cout << "Usage: " << argv[0] << " [problem_name] [problem_size] [input_file] [output_file]" << std::endl;
@@ -152,6 +182,8 @@ int main(int argc, char** argv) {
 	std::vector<Ciphertext> output_data_encrypt;
 	if (strcmp(problem_name, "mpspdz_matrix_multiply") == 0) {
 		mpspdz_matrix_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt);
+	} else if (strcmp(problem_name, "mpspdz_matrix_vector_multiply") == 0) {
+		mpspdz_matrix_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt);
 	} else {
 		std::cerr << "Unknown problem name" << std::endl;
 		return 1;

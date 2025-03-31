@@ -191,27 +191,25 @@ void real_statistics(
 	output_data.clear();
 	output_data.resize(2);
 
-	std::vector<seal::Ciphertext> squared_points(problem_size);
 	seal::Ciphertext& sum = output_data[0];
 	seal::Ciphertext& sum_squares = output_data[1];
 
 	sum = input_data[0];
 
 	seal::Ciphertext temp_square;
+	seal::Ciphertext first_square;
 	evaluator.square(input_data[0], sum_squares);
-	evaluator.square(input_data[0], temp_square);
+	evaluator.square(input_data[0], first_square);
 
 	for (std::size_t i = 0; i != round_num; i++) {
 		for (std::size_t j = 0; j != problem_size; j++) {
 			evaluator.add_inplace(sum, input_data[j]);
-			if (i == 0) {
-				evaluator.square(input_data[j], squared_points[j]);
-			}
-			evaluator.add_inplace(sum_squares, squared_points[j]);
+			evaluator.square(input_data[j], temp_square);
+			evaluator.add_inplace(sum_squares, temp_square);
 		}
 	}
 
-	evaluator.sub_inplace(sum_squares, temp_square);
+	evaluator.sub_inplace(sum_squares, first_square);
 	evaluator.sub_inplace(sum, input_data[0]);
 }
 

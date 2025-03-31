@@ -140,7 +140,7 @@ $(DEP_BUILD_DIR):
 	mkdir $@ || true
 
 install_deps: fastsudo
-	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev cgroup-tools
+	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev cgroup-tools binutils-dev libreadline-dev llvm libsodium-dev libgmp-dev
 	cd $(PROJECT_DIR)/osprey && ./install_deps.sh --install-osprey-deps
 
 clean:

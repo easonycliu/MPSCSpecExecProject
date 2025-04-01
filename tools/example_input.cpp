@@ -482,7 +482,7 @@ int main(int argc, char** argv) {
 		std::size_t sum_squares = 0;
 		for (std::size_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-			garbler_writers[w]->write_double(static_cast<double>(i) / 100.0);
+			garbler_writers[w]->write_double(i);
 			sum += i;
 			sum_squares += i * i;
 		}

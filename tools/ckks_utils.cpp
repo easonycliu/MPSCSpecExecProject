@@ -97,10 +97,10 @@ std::tuple<seal::EncryptionParameters, seal::SecretKey, seal::PublicKey, seal::R
 	return {parms, secret_key, public_key, relin_keys, gal_keys};
 }
 
-template <std::size_t level, typename T>
+template <typename T>
 seal::Ciphertext to_ciphertext(
 	std::shared_ptr<const seal::SEALContext::ContextData>& context_data, seal::Encryptor& encryptor,
-	seal::CKKSEncoder& encoder, const T& input
+	seal::CKKSEncoder& encoder, const T& input, std::size_t level
 ) {
 	seal::parms_id_type target_level_parms_id = context_data->parms_id();
 
@@ -112,7 +112,7 @@ seal::Ciphertext to_ciphertext(
 	return ciphertext;
 }
 
-template <std::size_t level, typename T>
+template <typename T>
 T from_ciphertext(seal::Decryptor& decryptor, seal::CKKSEncoder& encoder, const seal::Ciphertext& input) {
 	seal::Plaintext plaintext;
 	decryptor.decrypt(input, plaintext);
@@ -122,10 +122,10 @@ T from_ciphertext(seal::Decryptor& decryptor, seal::CKKSEncoder& encoder, const 
 	return value[0];
 }
 
-template <std::size_t level, typename T>
+template <typename T>
 void encrypt_file(
 	seal::EncryptionParameters& parms, seal::PublicKey& public_key, const std::vector<T>& input_data,
-	std::vector<seal::Ciphertext>& output_data
+	std::vector<seal::Ciphertext>& output_data, std::size_t level
 ) {
 	seal::SEALContext context(parms);
 	seal::Encryptor encryptor(context, public_key);
@@ -142,7 +142,7 @@ void encrypt_file(
 	}
 
 	for (const T& item : input_data) {
-		output_data.push_back(to_ciphertext<level>(context_data, encryptor, encoder, item));
+		output_data.push_back(to_ciphertext(context_data, encryptor, encoder, item, level));
 	}
 }
 
@@ -157,7 +157,7 @@ void decrypt_file(
 	seal::CKKSEncoder encoder(context);
 
 	for (const seal::Ciphertext& item : input_data) {
-		output_data.push_back(from_ciphertext<0, T>(decryptor, encoder, item));
+		output_data.push_back(from_ciphertext<T>(decryptor, encoder, item));
 	}
 }
 
@@ -341,6 +341,22 @@ int main(int argc, char** argv) {
 	std::size_t problem_size = std::stoull(problem_size_str.substr(0, problem_size_str.find_first_of(':')));
 	std::size_t round_num = std::stoull(problem_size_str.substr(problem_size_str.find_first_of(':') + 1));
 
+	std::size_t level = 0;
+	if (problem_name == "real_sum") {
+		level = 0;
+	} else if (problem_name == "real_statistics") {
+		level = 2;
+	} else if (problem_name == "real_matrix_vector_multiply") {
+		level = 1;
+	} else if (problem_name == "real_naive_matrix_multiply") {
+		level = 1;
+	} else if (problem_name == "real_tiled_matrix_multiply") {
+		level = 1;
+	} else {
+		std::cerr << "Unknown problem name" << std::endl;
+		return 1;
+	}
+
 	std::tuple<seal::EncryptionParameters, seal::SecretKey, seal::PublicKey, seal::RelinKeys, seal::GaloisKeys>
 		keypair = keygen();
 
@@ -349,7 +365,7 @@ int main(int argc, char** argv) {
 
 	std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
 	std::vector<seal::Ciphertext> input_data_encrypt;
-	encrypt_file<2>(std::get<0>(keypair), std::get<2>(keypair), input_data, input_data_encrypt);
+	encrypt_file(std::get<0>(keypair), std::get<2>(keypair), input_data, input_data_encrypt, level);
 	std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
 	std::cout << "Encrypt time: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"

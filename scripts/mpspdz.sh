@@ -12,7 +12,7 @@ batch_size=1
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
-project_dir=$(git rev-parse --show-toplevel)
+project_dir=$(realpath .)
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
 playground_dir=${project_dir}/logs/playground
 
@@ -24,11 +24,6 @@ MAGE=${project_dir}/install/tools/mage
 MPSPDZ_UTILS=${project_dir}/install/tools/mpspdz_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
-
-SUDO=
-if [ $(id -u) -ne 0 ]; then
-	SUDO=sudo
-fi
 
 for flag in "$@"; do
 	case $flag in
@@ -53,8 +48,8 @@ for flag in "$@"; do
 	esac
 done
 
-$SUDO sync
-echo 3 | $SUDO tee /proc/sys/vm/drop_caches
+sync
+echo 3 | tee /proc/sys/vm/drop_caches
 
 log_file=${log_dir}/${workload}.log
 mkdir -p ${log_dir}
@@ -66,7 +61,7 @@ echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then
-	tool_cmd="$OSPREY ${tool_args}"
+	tool_cmd="$OSPREY ${tool_args} --trace-filebase=${workload}_${input_size}_garbler"
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
 else
@@ -75,8 +70,8 @@ else
 fi
 
 if [ "${mem_limit}" != "" ]; then
-	$SUDO cgcreate -g memory:/osprey
-	$SUDO cgset -r memory.high="${mem_limit}M" osprey
+	cgcreate -g memory:/osprey
+	cgset -r memory.high="${mem_limit}M" osprey
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -86,13 +81,13 @@ pushd ${playground_dir}
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
-${SUDO} ${tool_cmd} --trace-filebase=${workload}_${input_size}_garbler ${MPSPDZ_UTILS} ${workload} ${input_size} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output | tee -a ${log_file}
+${tool_cmd} ${MPSPDZ_UTILS} ${workload} ${input_size} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output | tee -a ${log_file}
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd
 
 if [ "${mem_limit}" != "" ]; then
-	$SUDO cgdelete memory:/osprey
+	cgdelete memory:/osprey
 fi
 
 stty sane

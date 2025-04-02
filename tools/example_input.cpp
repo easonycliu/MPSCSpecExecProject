@@ -660,16 +660,15 @@ int main(int argc, char** argv) {
 	} else if (problem_name == "mpspdz_matrix_vector_multiply") {
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
-			double elem = i / 100.0;
-			garbler_writers[w]->write_double(elem);
-			expected_writers[w]->write_double(elem);
+			garbler_writers[w]->write32(static_cast<std::uint32_t>(i));
+			expected_writers[w]->write32(static_cast<std::uint32_t>(i));
 		}
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
 			for (std::uint64_t j = 0; j != input_size; j++) {
-				double elem = (i == j) ? 1.0 : 0.0;
+				std::uint32_t elem = (i == j) ? 1 : 0;
 				/* Identity matrix. */
-				garbler_writers[w]->write_double(elem);
+				garbler_writers[w]->write32(elem);
 			}
 		}
 	} else if (problem_name == "pmpspdz_vector_multiply") {

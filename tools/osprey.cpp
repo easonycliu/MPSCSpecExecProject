@@ -394,14 +394,14 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
         ("programmed-only", po::bool_switch(&config.programmed_only), "only run programmed pass")
         ("cleanup-only", po::bool_switch(&config.cleanup_overlays), "only clean up overlays")
         ("tracing-algorithm", po::value<std::string>(&config.tracing_algorithm)->default_value("MICROSET"), "algorithm to use for extracting the memory access pattern (MICROSET or FIFO)")
-        ("window-size", po::value<std::size_t>(&config.window_size)->default_value(16384), "window size to use for tracing")
+        ("window-size", po::value<std::size_t>(&config.window_size)->default_value(2048), "window size to use for tracing")
         ("trace-filebase", po::value<std::string>(&config.trace_filebase), "write access pattern trace to file at specified path")
         ("trace-to-stdout", po::bool_switch(&config.trace_to_stdout), "write trace in human-readable form to stdout")
         ("programming-algorithm", po::value<std::string>(&config.programming_algorithm)->default_value("3PO"))
-		("mem-limit-low", po::value<std::size_t>(&config.mem_limit_low)->default_value(262144), "low memory limit for 3PO in kilobytes")
-		("mem-limit-high", po::value<std::size_t>(&config.mem_limit_high)->default_value(262144 * 3), "high memory limit for 3PO in kilobytes")
-		("mem-limit-max", po::value<std::size_t>(&config.mem_limit_max)->default_value(262144 * 4), "max memory limit for 3PO in kilobytes")
-        ("batch-size", po::value<std::size_t>(&config.batch_size)->default_value(1024), "batch size for prefetching")
+		("mem-limit-low", po::value<std::size_t>(&config.mem_limit_low)->default_value(131072), "low memory limit for 3PO in kilobytes")
+		("mem-limit-high", po::value<std::size_t>(&config.mem_limit_high)->default_value(131072 * 3), "high memory limit for 3PO in kilobytes")
+		("mem-limit-max", po::value<std::size_t>(&config.mem_limit_max)->default_value(131072 * 4), "max memory limit for 3PO in kilobytes")
+        ("batch-size", po::value<std::size_t>(&config.batch_size)->default_value(8192), "batch size for prefetching")
         ("preserve-overlay-directories", po::bool_switch(&config.preserve_overlay_directories), "do not delete overlay directories");
 	// clang-format on
 

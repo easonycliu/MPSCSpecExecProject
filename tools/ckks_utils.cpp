@@ -285,7 +285,7 @@ void real_tiled_matrix_multiply(
 		input_data.data() + problem_size * problem_size, problem_size * problem_size
 	);
 
-	std::size_t memory_size = 1024 * 1024 * 1024;
+	std::size_t memory_size = 256 * 1024 * 1024;
 	std::size_t tile_size = std::max(((std::size_t) std::sqrt(memory_size)) / 2048, 1ul);
 
 	for (std::size_t batch_row_a = 0; batch_row_a < problem_size; batch_row_a += tile_size) {

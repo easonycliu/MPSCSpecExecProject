@@ -16,7 +16,7 @@ batch_size=1
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
-project_dir=$(git rev-parse --show-toplevel)
+project_dir=$(realpath .)
 log_dir=${project_dir}/logs/${current_date}/log_${current_time}
 playground_dir=${project_dir}/logs/playground
 
@@ -28,11 +28,6 @@ MAGE=${project_dir}/install/tools/mage
 CKKS_UTILS=${project_dir}/install/tools/ckks_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
-
-SUDO=
-if [ $(id -u) -ne 0 ]; then
-	SUDO=sudo
-fi
 
 for flag in "$@"; do
 	case $flag in
@@ -63,15 +58,16 @@ for flag in "$@"; do
 			workload=$(echo $flag | awk -F = '{print $2}')
 			;;
 		*)
-            echo "Unknown command-line flag" $flag
+			echo "Unknown command-line flag" $flag
 	esac
 done
 
-$SUDO sync
-echo 3 | $SUDO tee /proc/sys/vm/drop_caches
+mkdir -p ${log_dir}
+
+sync
+echo 3 | tee /proc/sys/vm/drop_caches
 
 log_file=${log_dir}/${workload}.log
-mkdir -p ${log_dir}
 touch ${log_file}
 echo Tool: ${tool} | tee -a ${log_file}
 echo Tool args: ${tool_args} | tee -a ${log_file}
@@ -82,20 +78,53 @@ echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 if [ "${tool}" == "osprey" ]; then
 	tool_cmd="$OSPREY"
 	tool_args="${tool_args} --trace-filebase=${workload}_${input_size}"
+	target_name="ckks_utils"
 elif [ "${tool}" == "mage" ]; then
 	tool_cmd="$MAGE"
 	tool_args=""
+	target_name="mage"
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
 	tool_args=""
+	target_name="ckks_utils"
 else
 	echo "Unknown tool" ${tool}
 	exit
 fi
 
-if [ "${mem_limit}" != "" ]; then
-	$SUDO cgcreate -g memory:/osprey
-	$SUDO cgset -r memory.high="${mem_limit}M" osprey
+rss_log_file=${log_dir}/${workload}_${input_size}.rss
+
+touch ${rss_log_file}
+echo "Timestamp,            RSS (MB)" > "$rss_log_file"
+
+monitor_rss() {
+	# Wait for the process to start
+	while true; do
+		PID=$(ps -a | grep "$target_name" | sort | tail -n 1 | awk '{print $1}')
+		echo "PID: $PID"
+		if [ -n "$PID" ]; then
+			echo "Monitoring process $target_name with PID $PID"
+			break
+		fi
+		sleep 1
+	done
+	
+	# Start monitoring RSS
+	while kill -0 $PID 2>/dev/null; do
+		RSS=$(ps -o rss= -p $PID 2>/dev/null)
+		if [ -z "$RSS" ]; then
+			echo "Process $PID has terminated."
+			break
+		fi
+		TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+		echo "$TIMESTAMP,  $(( RSS / 1024 ))" >> "$rss_log_file"
+		sleep 1  # Adjust interval as needed
+	done
+}
+
+if [ "${mem_limit}" != "" -a "${tool}" != "mage" ]; then
+	cgcreate -g memory:/osprey
+	cgset -r memory.high="${mem_limit}M" osprey
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -111,13 +140,15 @@ pushd ${playground_dir}
 
 $EXAMPLE_INPUT ${workload} ${input_size} 1 random
 
+monitor_rss &
+
 echo expected output is $(od -An -t fD ${workload}_${input_size}_0.expected | tail -n 2)
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
 	# echo 0 | $SUDO tee /sys/kernel/tracing/trace
 	# echo nop | $SUDO tee /sys/kernel/tracing/current_tracer
 	# echo 1 | $SUDO tee /sys/kernel/tracing/events/tlb/tlb_flush/enable
 	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
-	$SUDO ${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${input_size}:${round_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
+	${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${input_size}:${round_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
 	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
 elif [ "${tool}" == "mage" ]; then
 	page_shift=21
@@ -139,15 +170,15 @@ parties:
           internal_port: 56000
           external_host: localhost
           external_port: 57000
-          storage_path: evaluator_swapfile_1
+          storage_path: /dev/sdb2
 EOF
-	$SUDO $PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
-	$SUDO ${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
+	$PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
+	${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
 fi
 echo real output is $(od -An -t fD ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd
 
-if [ "${mem_limit}" != "" ]; then
-	$SUDO cgdelete memory:/osprey
+if [ "${mem_limit}" != "" -a "${tool}" != "mage" ]; then
+	cgdelete memory:/osprey
 fi

@@ -35,6 +35,69 @@
 
 #include "util/binaryfile.hpp"
 
+class MapReduce {
+public:
+	template <typename InputType, typename OutputType>
+	static void
+	map(const std::vector<InputType>& input_data, std::vector<OutputType>& mapped_data,
+		std::function<OutputType(const InputType&)> map_func, std::size_t num_threads) {
+		std::vector<std::thread> threads;
+
+		const std::size_t num_elements_per_thread = input_data.size() / num_threads + 1;
+
+		for (std::size_t t = 0; t < num_threads; ++t) {
+			threads.emplace_back([&, t]() {
+				for (std::size_t i = t * num_elements_per_thread; i < std::min(input_data.size(), (t + 1) * num_elements_per_thread); ++i) {
+					mapped_data[i] = map_func(input_data[i]);
+				}
+			});
+		}
+
+		for (std::size_t i = (num_threads - 1) * num_elements_per_thread; i < input_data.size(); ++i) {
+			mapped_data[i] = map_func(input_data[i]);
+		}
+
+		for (auto& thread : threads) {
+			thread.join();
+		}
+	}
+
+	template <typename InputType, typename OutputType>
+	static void
+	map(const std::vector<InputType>& input_data, std::vector<OutputType>& mapped_data,
+		std::function<void(const InputType&, OutputType&)> map_func, std::size_t num_threads) {
+		std::vector<std::thread> threads;
+
+		const std::size_t num_elements_per_thread = input_data.size() / num_threads + 1;
+
+		for (std::size_t t = 0; t < num_threads - 1; ++t) {
+			threads.emplace_back([&, t]() {
+				for (std::size_t i = t * num_elements_per_thread; i < std::min(input_data.size(), (t + 1) * num_elements_per_thread); ++i) {
+					map_func(input_data[i], mapped_data[i]);
+				}
+			});
+		}
+
+		for (std::size_t i = (num_threads - 1) * num_elements_per_thread; i < input_data.size(); ++i) {
+			map_func(input_data[i], mapped_data[i]);
+		}
+
+		for (auto& thread : threads) {
+			thread.join();
+		}
+	}
+
+	template <typename OutputType>
+	static void reduce(
+		const std::vector<OutputType>& mapped_data, OutputType& result,
+		std::function<OutputType(const OutputType&, const OutputType&)> reduce_func
+	) {
+		for (std::size_t i = 0; i < mapped_data.size(); i++) {
+			result = reduce_func(result, mapped_data[i]);
+		}
+	}
+};
+
 double ckks_scale = std::pow(2.0, 40);
 
 template <std::size_t bs, typename T>
@@ -98,18 +161,16 @@ std::tuple<seal::EncryptionParameters, seal::SecretKey, seal::PublicKey, seal::R
 }
 
 template <typename T>
-seal::Ciphertext to_ciphertext(
+void to_ciphertext(
 	std::shared_ptr<const seal::SEALContext::ContextData>& context_data, seal::Encryptor& encryptor,
-	seal::CKKSEncoder& encoder, const T& input, std::size_t level
+	seal::CKKSEncoder& encoder, const T& input, seal::Ciphertext& output, std::size_t level
 ) {
 	seal::parms_id_type target_level_parms_id = context_data->parms_id();
 
 	seal::Plaintext plaintext;
 	encoder.encode(input, target_level_parms_id, ckks_scale, plaintext);
 
-	seal::Ciphertext ciphertext;
-	encryptor.encrypt(plaintext, ciphertext);
-	return ciphertext;
+	encryptor.encrypt(plaintext, output);
 }
 
 template <typename T>
@@ -141,9 +202,19 @@ void encrypt_file(
 		std::abort();
 	}
 
-	for (const T& item : input_data) {
-		output_data.push_back(to_ciphertext(context_data, encryptor, encoder, item, level));
+	output_data.clear();
+	output_data.resize(input_data.size());
+	for (seal::Ciphertext& item : output_data) {
+		item.reserve(context, context_data->parms_id(), 2);
 	}
+	std::cerr << "Encrypting " << input_data.size() << " items" << std::endl;
+	MapReduce::map<T, seal::Ciphertext>(
+		input_data, output_data,
+		[&](const T& input, seal::Ciphertext& output) {
+			to_ciphertext(context_data, encryptor, encoder, input, output, level);
+		},
+		1
+	);
 }
 
 template <typename T>

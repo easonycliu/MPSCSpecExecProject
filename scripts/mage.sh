@@ -94,6 +94,37 @@ else
 	exit
 fi
 
+rss_log_file=${log_dir}/${workload}_${input_size}.rss
+target_name="mage"
+
+touch ${rss_log_file}
+echo "Timestamp,            RSS (MB)" > "$rss_log_file"
+
+monitor_rss() {
+	# Wait for the process to start
+	while true; do
+		PID=$(ps -a | grep "${target_name}\$" | sort | head -n 1 | awk '{print $1}')
+		echo "PID: $PID"
+		if [ -n "$PID" ]; then
+			echo "Monitoring process $target_name with PID $PID"
+			break
+		fi
+		sleep 1
+	done
+	
+	# Start monitoring RSS
+	while kill -0 $PID 2>/dev/null; do
+		RSS=$(ps -o rss= -p $PID 2>/dev/null)
+		if [ -z "$RSS" ]; then
+			echo "Process $PID has terminated."
+			break
+		fi
+		TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+		echo "$TIMESTAMP,  $(( RSS / 1024 ))" >> "$rss_log_file"
+		sleep 1  # Adjust interval as needed
+	done
+}
+
 if [ "${mem_limit}" != "" ]; then
 	cgcreate -g memory:/osprey
 	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgcreate -g memory:/osprey"
@@ -118,7 +149,7 @@ parties:
           internal_port: 56000
           external_host: ${other_ip}
           external_port: 54323
-          storage_path: evaluator_swapfile_1
+          storage_path: /dev/sdb2
 
     # Garbler
     - workers:
@@ -126,8 +157,11 @@ parties:
           internal_port: 50000
           external_host: ${this_ip}
           external_port: 54322
-          storage_path: garbler_swapfile_1
+          storage_path: /dev/sdb2
 EOF
+
+swapoff /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapoff /dev/sdb2"
 
 scp -i /home/yicheng/.ssh/id_rsa ${playground_dir}/config.yaml yicheng@${other_ip}:${playground_dir}/config.yaml
 
@@ -139,7 +173,14 @@ echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | ta
 $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size} | tee -a ${log_file}.evaluator
 ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size}" | tee -a ${log_file}.garbler
 
+monitor_rss &
+
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
+	mkswap /dev/sdb2
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo mkswap /dev/sdb2"
+	swapon /dev/sdb2
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapon /dev/sdb2"
+
 	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; fastsudo ${tool_cmd} ${tool_args_evaluator} ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
 	sleep 1
 	${tool_cmd} ${tool_args_garbler} ${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}.garbler

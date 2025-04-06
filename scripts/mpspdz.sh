@@ -69,6 +69,37 @@ else
 	exit
 fi
 
+rss_log_file=${log_dir}/${workload}_${input_size}.rss
+target_name="mpspdz_utils"
+
+touch ${rss_log_file}
+echo "Timestamp,            RSS (MB)" > "$rss_log_file"
+
+monitor_rss() {
+	# Wait for the process to start
+	while true; do
+		PID=$(ps -a | grep "${target_name}\$" | sort | tail -n 1 | awk '{print $1}')
+		echo "PID: $PID"
+		if [ -n "$PID" ]; then
+			echo "Monitoring process $target_name with PID $PID"
+			break
+		fi
+		sleep 1
+	done
+	
+	# Start monitoring RSS
+	while kill -0 $PID 2>/dev/null; do
+		RSS=$(ps -o rss= -p $PID 2>/dev/null)
+		if [ -z "$RSS" ]; then
+			echo "Process $PID has terminated."
+			break
+		fi
+		TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+		echo "$TIMESTAMP,  $(( RSS / 1024 ))" >> "$rss_log_file"
+		sleep 1  # Adjust interval as needed
+	done
+}
+
 if [ "${mem_limit}" != "" ]; then
 	cgcreate -g memory:/osprey
 	cgset -r memory.high="${mem_limit}M" osprey
@@ -79,6 +110,9 @@ mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
+
+swapon /dev/sdb2
+monitor_rss &
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
 ${tool_cmd} ${MPSPDZ_UTILS} ${workload} ${input_size} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output | tee -a ${log_file}

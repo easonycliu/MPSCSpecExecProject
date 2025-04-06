@@ -140,6 +140,8 @@ pushd ${playground_dir}
 
 $EXAMPLE_INPUT ${workload} ${input_size} 1 random
 
+swapoff /dev/sda2
+
 monitor_rss &
 
 echo expected output is $(od -An -t fD ${workload}_${input_size}_0.expected | tail -n 2)
@@ -148,6 +150,8 @@ if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
 	# echo nop | $SUDO tee /sys/kernel/tracing/current_tracer
 	# echo 1 | $SUDO tee /sys/kernel/tracing/events/tlb/tlb_flush/enable
 	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
+	mkswap /dev/sda2
+	swapon /dev/sda2
 	${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${input_size}:${round_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
 	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
 elif [ "${tool}" == "mage" ]; then

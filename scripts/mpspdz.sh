@@ -6,6 +6,7 @@ tool_args=
 input_size=
 mem_limit=
 workload=
+thread_num=1
 
 batch_size=1
 
@@ -21,7 +22,7 @@ log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
 MAGE=${project_dir}/install/tools/mage
-MPSPDZ_UTILS=${project_dir}/install/tools/mpspdz_utils
+MPSPDZ_UTILS=${project_dir}/install/tools/pmpspdz_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
 
@@ -43,6 +44,9 @@ for flag in "$@"; do
 		--workload=*)
 			workload=$(echo $flag | awk -F = '{print $2}')
 			;;
+		--thread_num=*)
+			thread_num=$(echo $flag | awk -F = '{print $2}')
+			;;
 		*)
 			echo "Unknown command-line flag" $flag
 	esac
@@ -59,6 +63,7 @@ echo Tool args: ${tool_args} | tee -a ${log_file}
 echo Input size: ${input_size} | tee -a ${log_file}
 echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
+echo Thread number: ${thread_num} | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then
 	tool_cmd="$OSPREY ${tool_args} --trace-filebase=${workload}_${input_size}_garbler"
@@ -70,7 +75,7 @@ else
 fi
 
 rss_log_file=${log_dir}/${workload}_${input_size}.rss
-target_name="mpspdz_utils"
+target_name="pmpspdz_utils"
 
 touch ${rss_log_file}
 echo "Timestamp,            RSS (MB)" > "$rss_log_file"
@@ -115,7 +120,7 @@ swapon /dev/sdb2
 monitor_rss &
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
-${tool_cmd} ${MPSPDZ_UTILS} ${workload} ${input_size} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output | tee -a ${log_file}
+${tool_cmd} ${MPSPDZ_UTILS} ${workload} ${input_size} ${thread_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output | tee -a ${log_file}
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd

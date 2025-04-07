@@ -144,7 +144,15 @@ pushd ${playground_dir}
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
 ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
 
+swapoff /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapoff /dev/sdb2"
+
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
+
+mkswap /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo mkswap /dev/sdb2"
+swapon /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapon /dev/sdb2"
 
 echo ${tool_cmd} ${tool_args_garbler} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
 ${tool_cmd} ${tool_args_garbler} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}.garbler &

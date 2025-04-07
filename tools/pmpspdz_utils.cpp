@@ -162,12 +162,12 @@ void pmpspdz_matrix_vector_multiply(
 	std::vector<std::size_t> tasks(problem_size);
 	std::iota(tasks.begin(), tasks.end(), 0);
 
-	output_data.resize(problem_size, to_ciphertext(keypair, 0));
+	output_data.resize(problem_size, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
 	MapReduce::map<std::size_t, Ciphertext>(
 		tasks, output_data,
 		[&](const std::size_t& i, Ciphertext& output) {
 			for (std::size_t j = 0; j < problem_size; j++) {
-				output += input_data[i * problem_size + j].mul(keypair.pk, input_data[problem_size * problem_size + j]);
+				output += input_data[j].mul(keypair.pk, input_data[problem_size + i * problem_size + j]);
 			}
 		},
 		num_threads
@@ -247,6 +247,8 @@ int main(int argc, char** argv) {
 	std::vector<Ciphertext> output_data_encrypt;
 	if (strcmp(problem_name, "pmpspdz_matrix_multiply") == 0) {
 		pmpspdz_matrix_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
+	} else if (strcmp(problem_name, "pmpspdz_matrix_vector_multiply") == 0) {
+		pmpspdz_matrix_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
 	} else if (strcmp(problem_name, "pmpspdz_vector_multiply") == 0) {
 		pmpspdz_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
 	} else if (strcmp(problem_name, "pmpspdz_sum") == 0) {

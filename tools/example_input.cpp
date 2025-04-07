@@ -657,7 +657,7 @@ int main(int argc, char** argv) {
 				);
 			}
 		}
-	} else if (problem_name == "mpspdz_matrix_vector_multiply") {
+	} else if (problem_name == "mpspdz_matrix_vector_multiply" || problem_name == "pmpspdz_matrix_vector_multiply") {
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			std::uint64_t w = get_blocked_worker(i, num_workers, input_size);
 			garbler_writers[w]->write32(static_cast<std::uint32_t>(i));

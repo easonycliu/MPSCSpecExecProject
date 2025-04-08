@@ -7,9 +7,10 @@ compile=
 compile_flags=
 
 input_size=
-round_num=1
 mem_limit=
 workload=
+this_ip=
+other_ip=
 
 batch_size=1
 
@@ -21,11 +22,12 @@ log_dir=${project_dir}/logs/${current_date}/log_${current_time}
 playground_dir=${project_dir}/logs/playground
 
 tool_cmd=
+tool_args_garbler=
+tool_args_evaluator=
 log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
-MAGE=${project_dir}/install/tools/mage
-CKKS_UTILS=${project_dir}/install/tools/ckks_utils
+SENATE_UTILS=${project_dir}/install/tools/senate_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
 
@@ -48,26 +50,28 @@ for flag in "$@"; do
 		--input_size=*)
 			input_size=$(echo $flag | awk -F = '{print $2}')
 			;;
-		--round_num=*)
-			round_num=$(echo $flag | awk -F = '{print $2}')
-			;;
 		--mem_limit=*)
 			mem_limit=$(echo $flag | awk -F = '{print $2}')
 			;;
 		--workload=*)
 			workload=$(echo $flag | awk -F = '{print $2}')
 			;;
+		--this_ip=*)
+			this_ip=$(echo $flag | awk -F = '{print $2}')
+			;;
+		--other_ip=*)
+			other_ip=$(echo $flag | awk -F = '{print $2}')
+			;;
 		*)
 			echo "Unknown command-line flag" $flag
 	esac
 done
 
-mkdir -p ${log_dir}
-
 sync
 echo 3 | tee /proc/sys/vm/drop_caches
 
 log_file=${log_dir}/${workload}.log
+mkdir -p ${log_dir}
 touch ${log_file}
 echo Tool: ${tool} | tee -a ${log_file}
 echo Tool args: ${tool_args} | tee -a ${log_file}
@@ -77,22 +81,19 @@ echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then
 	tool_cmd="$OSPREY"
-	tool_args="${tool_args} --trace-filebase=${workload}_${input_size}"
-	target_name="ckks_utils"
-elif [ "${tool}" == "mage" ]; then
-	tool_cmd="$MAGE"
-	tool_args=""
-	target_name="mage"
+	tool_args_garbler="${tool_args} --trace-filebase=${workload}_${input_size}_garbler"
+	tool_args_evaluator="${tool_args} --trace-filebase=${workload}_${input_size}_evaluator"
 elif [ "${tool}" == "baseline" ]; then
 	tool_cmd=""
-	tool_args=""
-	target_name="ckks_utils"
+	tool_args_garbler=""
+	tool_args_evaluator=""
 else
 	echo "Unknown tool" ${tool}
 	exit
 fi
 
 rss_log_file=${log_dir}/${workload}_${input_size}.rss
+target_name="senate_utils"
 
 touch ${rss_log_file}
 echo "Timestamp,            RSS (MB)" > "$rss_log_file"
@@ -122,9 +123,11 @@ monitor_rss() {
 	done
 }
 
-if [ "${mem_limit}" != "" -a "${tool}" != "mage" ]; then
+if [ "${mem_limit}" != "" ]; then
 	cgcreate -g memory:/osprey
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgcreate -g memory:/osprey"
 	cgset -r memory.high="${mem_limit}M" osprey
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgset -r memory.high=${mem_limit}M osprey"
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -138,51 +141,36 @@ fi
 mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
-$EXAMPLE_INPUT ${workload} ${input_size} 1 random
+${EXAMPLE_INPUT} ${workload} ${input_size} 1
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
 
-swapoff /dev/sda2
+swapoff /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapoff /dev/sdb2"
+
+echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
+
+mkswap /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo mkswap /dev/sdb2"
+swapon /dev/sdb2
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapon /dev/sdb2"
+
+echo ${tool_cmd} ${tool_args_garbler} ${SENATE_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
+${tool_cmd} ${tool_args_garbler} ${SENATE_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}.garbler &
 
 monitor_rss &
 
-echo expected output is $(od -An -t fD ${workload}_${input_size}_0.expected | tail -n 2)
-if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-	# echo 0 | $SUDO tee /sys/kernel/tracing/trace
-	# echo nop | $SUDO tee /sys/kernel/tracing/current_tracer
-	# echo 1 | $SUDO tee /sys/kernel/tracing/events/tlb/tlb_flush/enable
-	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
-	mkswap /dev/sda2
-	swapon /dev/sda2
-	${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${input_size}:${round_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
-	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
-elif [ "${tool}" == "mage" ]; then
-	page_shift=21
-	num_pages=32768
-	if [ "${mem_limit}" != "" ]; then
-		num_pages=$(( ( ( mem_limit << 20 ) >> page_shift ) - 48 ))
-	fi
-	cat <<EOF >config.yaml
-page_shift: ${page_shift}
-num_pages: ${num_pages}
-round_num: ${round_num}
-prefetch_buffer_size: 16
-prefetch_lookahead: 100
+sleep 1
+echo ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${SENATE_UTILS} ${workload} ${input_size} 2 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
+ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${SENATE_UTILS} ${workload} ${input_size} 2 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output" | tee -a ${log_file}.evaluator
 
-parties:
-    # Evaluator
-    - workers:
-        - internal_host: localhost
-          internal_port: 56000
-          external_host: localhost
-          external_port: 57000
-          storage_path: /dev/sdb2
-EOF
-	$PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
-	${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
-fi
-echo real output is $(od -An -t fD ${workload}_${input_size}_0_garbler.output | tail -n 2)
+echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
 popd
 
-if [ "${mem_limit}" != "" -a "${tool}" != "mage" ]; then
+if [ "${mem_limit}" != "" ]; then
 	cgdelete memory:/osprey
+	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgdelete memory:/osprey"
 fi
+
+stty sane
+echo ""

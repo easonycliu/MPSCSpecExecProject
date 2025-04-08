@@ -89,23 +89,25 @@ void pmpspdz_sum(
 	std::vector<Ciphertext>& output_data, std::size_t num_threads
 ) {
 	const std::size_t chunk_size = std::max<std::size_t>(1, input_data.size() / num_threads);
-	std::vector<std::vector<Ciphertext>> chunks;
+	std::vector<std::vector<std::size_t>> chunks;
 
 	for (std::size_t i = 0; i < input_data.size(); i += chunk_size) {
-		auto end = std::min(i + chunk_size, input_data.size());
-		chunks.emplace_back(input_data.begin() + i, input_data.begin() + end);
+		std::size_t end = std::min(i + chunk_size, input_data.size());
+		std::vector<std::size_t> chunk(end - i);
+		std::iota(chunk.begin(), chunk.end(), i);
+		chunks.push_back(chunk);
 	}
 
 	std::vector<Ciphertext> partial_sums;
 	partial_sums.resize(chunks.size(), to_ciphertext(keypair, 0));
-	MapReduce::map<std::vector<Ciphertext>, Ciphertext>(
-		chunks, partial_sums,
-		[](const std::vector<Ciphertext>& chunk) -> Ciphertext {
-			Ciphertext sum = chunk[0];
-			for (std::size_t i = 1; i < chunk.size(); i++) {
-				sum += chunk[i];
+	std::vector<std::size_t> partial_sums_indexes(chunks.size());
+	std::iota(partial_sums_indexes.begin(), partial_sums_indexes.end(), 0);
+	MapReduce::map<std::vector<std::size_t>, std::size_t>(
+		chunks, partial_sums_indexes,
+		[&](const std::vector<std::size_t>& chunk, std::size_t& index) {
+			for (std::size_t i : chunk) {
+				partial_sums[index] += input_data[i];
 			}
-			return sum;
 		},
 		num_threads
 	);
@@ -127,27 +129,38 @@ void pmpspdz_vector_multiply(
 		std::cerr << "Input data size must be even" << std::endl;
 		std::abort();
 	}
-	const std::size_t vector_size = input_data.size() / 2;
 
-	std::vector<std::pair<Ciphertext, Ciphertext>> paired_input;
-	for (std::size_t i = 0; i < vector_size; i++) {
-		paired_input.emplace_back(input_data[i], input_data[vector_size + i]);
+	std::size_t vector_size = input_data.size() / 2;
+	std::size_t elements_per_thread = vector_size / num_threads + int(vector_size % num_threads != 0);
+
+	std::vector<Ciphertext> partial_sums(num_threads, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
+
+	std::vector<std::thread> threads;
+
+	for (std::size_t i = 0; i < num_threads - 1; ++i) {
+		threads.emplace_back(std::thread([&]() {
+			std::size_t start = i * elements_per_thread;
+			std::size_t end = std::min(start + elements_per_thread, vector_size);
+			for (std::size_t j = start; j < end; ++j) {
+				partial_sums[i] += input_data[j].mul(keypair.pk, input_data[vector_size + j]);
+			}
+		}));
 	}
 
-	std::vector<Ciphertext> products;
-	products.resize(paired_input.size(), to_ciphertext(keypair, 0));
-	MapReduce::map<std::pair<Ciphertext, Ciphertext>, Ciphertext>(
-		paired_input, products,
-		[&](const std::pair<Ciphertext, Ciphertext>& pair) -> Ciphertext {
-			return pair.first.mul(keypair.pk, pair.second);
-		},
-		num_threads
-	);
+	std::size_t start = (num_threads - 1) * elements_per_thread;
+	std::size_t end = vector_size;
+	for (std::size_t j = start; j < end; ++j) {
+		partial_sums[num_threads - 1] += input_data[j].mul(keypair.pk, input_data[vector_size + j]);
+	}
+
+	for (auto& thread : threads) {
+		thread.join();
+	}
 
 	output_data.resize(1, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
-	MapReduce::reduce<Ciphertext>(products, output_data[0], [](const Ciphertext& a, const Ciphertext& b) -> Ciphertext {
-		return a + b;
-	});
+	for (const auto& partial_sum : partial_sums) {
+		output_data[0] += partial_sum;
+	}
 }
 
 void pmpspdz_matrix_vector_multiply(

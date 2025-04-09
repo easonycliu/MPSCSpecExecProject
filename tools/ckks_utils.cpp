@@ -33,9 +33,8 @@
 #include <string>
 #include <thread>
 
-#include "util/binaryfile.hpp"
-
 #include "mapreduce.hpp"
+#include "util/binaryfile.hpp"
 
 double ckks_scale = std::pow(2.0, 40);
 

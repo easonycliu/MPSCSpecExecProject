@@ -17,6 +17,15 @@
 
 #include "mapreduce.hpp"
 
+class Problem {
+public:
+	Problem() = default;
+	virtual ~Problem() = default;
+	virtual void divide(std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data) = 0;
+	virtual void calculate(std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data, std::vector<Ciphertext>& output_data) = 0;
+	virtual void aggregate(const std::vector<std::vector<int>>& partial_output_data, std::vector<int>& output_data) = 0;
+};
+
 Ciphertext to_ciphertext(FHE_KeyPair& keypair, int value) {
 	Plaintext_mod_prime plaintext(keypair.pk.get_params().get_plaintext_field_data<FFT_Data>());
 	plaintext.assign_constant(value);
@@ -82,6 +91,49 @@ void decrypt_file(FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_dat
 		output_data.push_back(value);
 	}
 }
+
+class VectorMultiply : public Problem {
+public:
+	VectorMultiply() = default;
+
+	void divide(std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data) override {
+		if (input_data.size() != problem_size * 2) {
+			std::cerr << "Input data size must be twice the problem size." << std::endl;
+			return;
+		}
+		std::size_t vector_size = input_data.size() / 2;
+		std::size_t vector_size_per_worker = vector_size / workers + std::size_t(vector_size % workers != 0);
+		for (std::size_t i = 0; i < workers; ++i) {
+			std::size_t start = i * vector_size_per_worker;
+			std::size_t end = std::min(start + vector_size_per_worker, vector_size);
+			std::vector<int> chunk(input_data.begin() + start, input_data.begin() + end);
+			chunk.insert(chunk.end(), input_data.begin() + vector_size + start, input_data.begin() + vector_size + end);
+			divide_input_data.emplace_back(end - start, std::move(chunk));
+		}
+	}
+
+	void calculate(std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data, std::vector<Ciphertext>& output_data) override {
+		if (input_data.size()  != problem_size * 2) {
+			std::cerr << "Input data size must be twice the problem size." << std::endl;
+			return;
+		}
+
+		std::size_t vector_size = input_data.size() / 2;
+		output_data.resize(1, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
+		for (std::size_t i = 0; i < vector_size; ++i) {
+			output_data[0] += input_data[i].mul(keypair.pk, input_data[vector_size + i]);
+		}
+	}
+
+	void aggregate(const std::vector<std::vector<int>>& partial_output_data, std::vector<int>& output_data) override {
+		output_data.resize(1, 0);
+		for (const std::vector<int>& one_partial_output_data : partial_output_data) {
+			for (int item : one_partial_output_data) {
+				output_data[0] += item;
+			}
+		}
+	}
+};
 
 // Summation Logic Using MapReduce (Parallelized)
 void pmpspdz_sum(
@@ -248,43 +300,77 @@ int main(int argc, char** argv) {
 
 	std::vector<int> input_data;
 	read_from_file<bs>(input_file, input_data);
+	std::unique_ptr<Problem> problem;
 
-	std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
-	std::vector<Ciphertext> input_data_encrypt;
-	encrypt_file(keypair, input_data, input_data_encrypt);
-	std::chrono::high_resolution_clock::time_point encrypt_end = std::chrono::high_resolution_clock::now();
-	std::cout << "Encrypt time: "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
-			  << std::endl;
-
-	std::vector<Ciphertext> output_data_encrypt;
-	if (strcmp(problem_name, "pmpspdz_matrix_multiply") == 0) {
-		pmpspdz_matrix_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
-	} else if (strcmp(problem_name, "pmpspdz_matrix_vector_multiply") == 0) {
-		pmpspdz_matrix_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
-	} else if (strcmp(problem_name, "pmpspdz_vector_multiply") == 0) {
-		pmpspdz_vector_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
-	} else if (strcmp(problem_name, "pmpspdz_sum") == 0) {
-		pmpspdz_sum(problem_size, keypair, input_data_encrypt, output_data_encrypt, thread_num);
+	if (strcmp(problem_name, "pmpspdz_vector_multiply") == 0) {
+		problem = std::make_unique<VectorMultiply>();
 	} else {
-		std::cerr << "Unknown problem name" << std::endl;
+		std::cerr << "Unknown problem name: " << problem_name << std::endl;
 		return 1;
 	}
 
-	std::chrono::high_resolution_clock::time_point calc_end = std::chrono::high_resolution_clock::now();
-	std::cout << "Calc time: " << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end - encrypt_end).count()
-			  << " ms" << std::endl;
+	std::vector<std::pair<std::size_t, std::vector<int>>> divide_input_data;
+	problem->divide(thread_num, problem_size, input_data, divide_input_data);
+	std::vector<std::vector<int>> partial_output_data(divide_input_data.size());
+
+	std::array<std::pair<std::string, std::vector<std::atomic<bool>>>, 3> progress;
+	progress[0].first = "Encrypt";
+	progress[0].second = std::vector<std::atomic<bool>>(thread_num);
+	progress[1].first = "Calculate";
+	progress[1].second = std::vector<std::atomic<bool>>(thread_num);
+	progress[2].first = "Decrypt";
+	progress[2].second = std::vector<std::atomic<bool>>(thread_num);
+	std::vector<std::thread> threads(thread_num);
+	for (std::size_t i = 0; i < thread_num; ++i) {
+		threads.emplace_back([&, i]() {
+			std::vector<Ciphertext> encrypt_input_data;
+			encrypt_file(keypair, divide_input_data[i].second, encrypt_input_data);
+			progress[0].second[i] = true;
+
+			std::vector<Ciphertext> encrypt_output_data;
+			problem->calculate(divide_input_data[i].first, keypair, encrypt_input_data, encrypt_output_data);
+			progress[1].second[i] = true;
+
+			decrypt_file(keypair, encrypt_output_data, partial_output_data[i]);
+			progress[2].second[i] = true;
+		});
+	}
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> total_start = std::chrono::high_resolution_clock::now();
+	for (std::size_t i = 0; i < progress.size(); ++i) {
+		std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
+		while (true) {
+			bool done = true;
+			for (std::size_t j = 0; j < thread_num; ++j) {
+				if (!progress[i].second[j]) {
+					done = false;
+					break;
+				}
+			}
+			if (done) {
+				break;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+		std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
+		std::cout << progress[i].first << " time: "
+				  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+				  << " milliseconds" << std::endl;
+	}
+	std::chrono::time_point<std::chrono::high_resolution_clock> total_end = std::chrono::high_resolution_clock::now();
+	std::cout << "Total time: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start).count()
+			  << " milliseconds" << std::endl;
+
+	for (auto& thread : threads) {
+		if (thread.joinable()) {
+			thread.join();
+		}
+	}
 
 	std::vector<int> output_data;
-	decrypt_file(keypair, output_data_encrypt, output_data);
-	std::chrono::high_resolution_clock::time_point decrypt_end = std::chrono::high_resolution_clock::now();
-	std::cout << "Decrypt time: "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - calc_end).count() << " ms"
-			  << std::endl;
-
-	std::cout << "Total time: "
-			  << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - encrypt_start).count() << " ms"
-			  << std::endl;
-
+	problem->aggregate(partial_output_data, output_data);
 	write_to_file<bs>(output_file, output_data);
+
+	return 0;
 }

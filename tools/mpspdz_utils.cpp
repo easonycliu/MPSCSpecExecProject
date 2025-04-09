@@ -79,6 +79,22 @@ void decrypt_file(FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_dat
 	}
 }
 
+void mpspdz_vector_multiply(
+	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
+	std::vector<Ciphertext>& output_data
+) {
+	if (input_data.size() != problem_size * 2) {
+		std::cerr << "Input data size does not match problem size" << std::endl;
+		std::abort();
+	}
+
+	output_data.clear();
+	output_data.reserve(problem_size);
+	for (std::size_t i = 0; i < problem_size; i++) {
+		output_data.push_back(input_data[i].mul(keypair.pk, input_data[i + problem_size]));
+	}
+}
+
 void mpspdz_matrix_multiply(
 	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
 	std::vector<Ciphertext>& output_data

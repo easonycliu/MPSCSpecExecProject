@@ -349,148 +349,6 @@ public:
 	}
 };
 
-// Summation Logic Using MapReduce (Parallelized)
-void pmpspdz_sum(
-	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
-	std::vector<Ciphertext>& output_data, std::size_t num_threads
-) {
-	const std::size_t chunk_size = std::max<std::size_t>(1, input_data.size() / num_threads);
-	std::vector<std::vector<std::size_t>> chunks;
-
-	for (std::size_t i = 0; i < input_data.size(); i += chunk_size) {
-		std::size_t end = std::min(i + chunk_size, input_data.size());
-		std::vector<std::size_t> chunk(end - i);
-		std::iota(chunk.begin(), chunk.end(), i);
-		chunks.push_back(chunk);
-	}
-
-	std::vector<Ciphertext> partial_sums;
-	partial_sums.resize(chunks.size(), to_ciphertext(keypair, 0));
-	std::vector<std::size_t> partial_sums_indexes(chunks.size());
-	std::iota(partial_sums_indexes.begin(), partial_sums_indexes.end(), 0);
-	MapReduce::map<std::vector<std::size_t>, std::size_t>(
-		chunks, partial_sums_indexes,
-		[&](const std::vector<std::size_t>& chunk, std::size_t& index) {
-			for (std::size_t i : chunk) {
-				partial_sums[index] += input_data[i];
-			}
-		},
-		num_threads
-	);
-
-	output_data.resize(1, to_ciphertext(keypair, 0));
-	MapReduce::reduce<Ciphertext>(
-		partial_sums, output_data[0],
-		[](const Ciphertext& a, const Ciphertext& b) -> Ciphertext {
-			return a + b;
-		}
-	);
-}
-
-void pmpspdz_vector_multiply(
-	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
-	std::vector<Ciphertext>& output_data, std::size_t num_threads
-) {
-	if (input_data.size() % 2 != 0) {
-		std::cerr << "Input data size must be even" << std::endl;
-		std::abort();
-	}
-
-	std::size_t vector_size = input_data.size() / 2;
-	std::size_t elements_per_thread = vector_size / num_threads + int(vector_size % num_threads != 0);
-
-	std::vector<Ciphertext> partial_sums(
-		num_threads, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1))
-	);
-
-	std::vector<std::thread> threads;
-
-	for (std::size_t i = 0; i < num_threads - 1; ++i) {
-		threads.emplace_back(std::thread([&]() {
-			std::size_t start = i * elements_per_thread;
-			std::size_t end = std::min(start + elements_per_thread, vector_size);
-			for (std::size_t j = start; j < end; ++j) {
-				partial_sums[i] += input_data[j].mul(keypair.pk, input_data[vector_size + j]);
-			}
-		}));
-	}
-
-	std::size_t start = (num_threads - 1) * elements_per_thread;
-	std::size_t end = vector_size;
-	for (std::size_t j = start; j < end; ++j) {
-		partial_sums[num_threads - 1] += input_data[j].mul(keypair.pk, input_data[vector_size + j]);
-	}
-
-	for (auto& thread : threads) {
-		thread.join();
-	}
-
-	output_data.resize(1, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
-	for (const auto& partial_sum : partial_sums) {
-		output_data[0] += partial_sum;
-	}
-}
-
-void pmpspdz_matrix_vector_multiply(
-	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
-	std::vector<Ciphertext>& output_data, std::size_t num_threads
-) {
-	if (input_data.size() != problem_size * problem_size + problem_size) {
-		std::cerr << "Input data size does not match problem size" << std::endl;
-		std::abort();
-	}
-
-	std::vector<std::size_t> tasks(problem_size);
-	std::iota(tasks.begin(), tasks.end(), 0);
-
-	output_data.resize(problem_size, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
-	MapReduce::map<std::size_t, Ciphertext>(
-		tasks, output_data,
-		[&](const std::size_t& i, Ciphertext& output) {
-			for (std::size_t j = 0; j < problem_size; j++) {
-				output += input_data[j].mul(keypair.pk, input_data[problem_size + i * problem_size + j]);
-			}
-		},
-		num_threads
-	);
-}
-
-// Matrix Multiplication Logic Using MapReduce
-void pmpspdz_matrix_multiply(
-	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
-	std::vector<Ciphertext>& output_data, std::size_t num_threads
-) {
-	if (input_data.size() != problem_size * problem_size * 2) {
-		std::cerr << "Input data size does not match problem size" << std::endl;
-		std::abort();
-	}
-
-	std::vector<std::pair<std::size_t, std::size_t>> tasks;
-	for (std::size_t i = 0; i < problem_size; i++) {
-		for (std::size_t j = 0; j < problem_size; j++) {
-			tasks.emplace_back(i, j);
-		}
-	}
-
-	output_data.resize(problem_size * problem_size, to_ciphertext(keypair, 0));
-	MapReduce::map<std::pair<std::size_t, std::size_t>, Ciphertext>(
-		tasks, output_data,
-		[&](const std::pair<std::size_t, std::size_t>& task) -> Ciphertext {
-			std::size_t i = task.first;
-			std::size_t j = task.second;
-			Ciphertext result =
-				input_data[i * problem_size].mul(keypair.pk, input_data[problem_size * problem_size + j]);
-			for (std::size_t k = 1; k < problem_size; k++) {
-				result += input_data[i * problem_size + k].mul(
-					keypair.pk, input_data[problem_size * problem_size + k * problem_size + j]
-				);
-			}
-			return result;
-		},
-		num_threads
-	);
-}
-
 int main(int argc, char** argv) {
 	if (argc != 6) {
 		std::cout << "Usage: " << argv[0] << " [problem_name] [problem_size] [thread_num] [input_file] [output_file]"
@@ -518,11 +376,11 @@ int main(int argc, char** argv) {
 	read_from_file<bs>(input_file, input_data);
 	std::unique_ptr<Problem> problem;
 
-	if (strcmp(problem_name, "pmpspdz_vector_multiply") == 0) {
+	if (strcmp(problem_name, "pmpspdz_vector_multiply") == 0 || strcmp(problem_name, "mpspdz_vector_multiply") == 0) {
 		problem = std::make_unique<VectorMultiply>();
-	} else if (strcmp(problem_name, "pmpspdz_matrix_vector_multiply") == 0) {
+	} else if (strcmp(problem_name, "pmpspdz_matrix_vector_multiply") == 0 || strcmp(problem_name, "mpspdz_matrix_vector_multiply") == 0) {
 		problem = std::make_unique<MatrixVectorMultiply>();
-	} else if (strcmp(problem_name, "pmpspdz_matrix_multiply") == 0) {
+	} else if (strcmp(problem_name, "pmpspdz_matrix_multiply") == 0 || strcmp(problem_name, "mpspdz_matrix_multiply") == 0) {
 		problem = std::make_unique<MatrixMultiply>();
 	} else {
 		std::cerr << "Unknown problem name: " << problem_name << std::endl;

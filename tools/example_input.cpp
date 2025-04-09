@@ -488,6 +488,16 @@ int main(int argc, char** argv) {
 		}
 		expected_writers[0]->write_double(sum);
 		expected_writers[0]->write_double(sum_squares);
+	} else if (problem_name == "real_vector_multiply") {
+		for (std::uint64_t i = 0; i != input_size; i++) {
+			garbler_writers[get_blocked_worker(i, num_workers, input_size)]->write_double(1);
+		}
+
+		for (std::uint64_t i = 0; i != input_size; i++) {
+			garbler_writers[get_blocked_worker(i, num_workers, input_size)]->write_double(1);
+		}
+
+		expected_writers[0]->write_double(input_size);
 	} else if (problem_name == "real_matrix_vector_multiply") {
 		if (option == "") {
 			for (std::uint64_t i = 0; i != input_size; i++) {
@@ -671,7 +681,7 @@ int main(int argc, char** argv) {
 				garbler_writers[w]->write32(elem);
 			}
 		}
-	} else if (problem_name == "pmpspdz_vector_multiply") {
+	} else if (problem_name == "mpspdz_vector_multiply" || problem_name == "pmpspdz_vector_multiply") {
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			garbler_writers[get_blocked_worker(i, num_workers, input_size)]->write32(1);
 		}

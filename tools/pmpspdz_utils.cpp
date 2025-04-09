@@ -14,15 +14,30 @@
 #include "Math/bigint.h"
 #include "Math/modp.hpp"
 #include "Tools/random.h"
-
 #include "mapreduce.hpp"
 
 class Problem {
 public:
 	Problem() = default;
 	virtual ~Problem() = default;
-	virtual void divide(std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data) = 0;
-	virtual void calculate(std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data, std::vector<Ciphertext>& output_data) = 0;
+	virtual void divide(
+		std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data,
+		std::vector<int>& share_input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data
+	) = 0;
+	virtual void format(
+		std::size_t problem_size, const std::vector<Ciphertext>& share_input_data,
+		const std::vector<Ciphertext>& private_input_data,
+		std::pair<
+			std::vector<std::reference_wrapper<const Ciphertext>>,
+			std::vector<std::reference_wrapper<const Ciphertext>>>& format_input_data
+	) = 0;
+	virtual void calculate(
+		std::size_t problem_size, FHE_KeyPair& keypair,
+		const std::pair<
+			std::vector<std::reference_wrapper<const Ciphertext>>,
+			std::vector<std::reference_wrapper<const Ciphertext>>>& input_data,
+		std::vector<Ciphertext>& output_data
+	) = 0;
 	virtual void aggregate(const std::vector<std::vector<int>>& partial_output_data, std::vector<int>& output_data) = 0;
 };
 
@@ -96,11 +111,16 @@ class VectorMultiply : public Problem {
 public:
 	VectorMultiply() = default;
 
-	void divide(std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data) override {
+	void divide(
+		std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data,
+		std::vector<int>& share_input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data
+	) override {
 		if (input_data.size() != problem_size * 2) {
 			std::cerr << "Input data size must be twice the problem size." << std::endl;
 			return;
 		}
+		share_input_data.clear();
+		divide_input_data.clear();
 		std::size_t vector_size = input_data.size() / 2;
 		std::size_t vector_size_per_worker = vector_size / workers + std::size_t(vector_size % workers != 0);
 		for (std::size_t i = 0; i < workers; ++i) {
@@ -112,16 +132,39 @@ public:
 		}
 	}
 
-	void calculate(std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data, std::vector<Ciphertext>& output_data) override {
-		if (input_data.size()  != problem_size * 2) {
+	void format(
+		std::size_t problem_size, const std::vector<Ciphertext>& share_input_data,
+		const std::vector<Ciphertext>& private_input_data,
+		std::pair<
+			std::vector<std::reference_wrapper<const Ciphertext>>,
+			std::vector<std::reference_wrapper<const Ciphertext>>>& format_input_data
+	) override {
+		if (private_input_data.size() != problem_size * 2) {
 			std::cerr << "Input data size must be twice the problem size." << std::endl;
 			return;
 		}
 
-		std::size_t vector_size = input_data.size() / 2;
+		for (std::size_t i = 0; i < problem_size; ++i) {
+			format_input_data.first.emplace_back(private_input_data[i]);
+			format_input_data.second.emplace_back(private_input_data[i + problem_size]);
+		}
+	}
+
+	void calculate(
+		std::size_t problem_size, FHE_KeyPair& keypair,
+		const std::pair<
+			std::vector<std::reference_wrapper<const Ciphertext>>,
+			std::vector<std::reference_wrapper<const Ciphertext>>>& input_data,
+		std::vector<Ciphertext>& output_data
+	) override {
+		if (input_data.first.size() != problem_size || input_data.second.size() != problem_size) {
+			std::cerr << "Input data size must be twice the problem size." << std::endl;
+			return;
+		}
+
 		output_data.resize(1, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
-		for (std::size_t i = 0; i < vector_size; ++i) {
-			output_data[0] += input_data[i].mul(keypair.pk, input_data[vector_size + i]);
+		for (std::size_t i = 0; i < problem_size; ++i) {
+			output_data[0] += input_data.first[i].get().mul(keypair.pk, input_data.second[i].get());
 		}
 	}
 
@@ -185,7 +228,9 @@ void pmpspdz_vector_multiply(
 	std::size_t vector_size = input_data.size() / 2;
 	std::size_t elements_per_thread = vector_size / num_threads + int(vector_size % num_threads != 0);
 
-	std::vector<Ciphertext> partial_sums(num_threads, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1)));
+	std::vector<Ciphertext> partial_sums(
+		num_threads, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1))
+	);
 
 	std::vector<std::thread> threads;
 
@@ -310,8 +355,19 @@ int main(int argc, char** argv) {
 	}
 
 	std::vector<std::pair<std::size_t, std::vector<int>>> divide_input_data;
-	problem->divide(thread_num, problem_size, input_data, divide_input_data);
+	std::vector<int> share_input_data;
+	problem->divide(thread_num, problem_size, input_data, share_input_data, divide_input_data);
 	std::vector<std::vector<int>> partial_output_data(divide_input_data.size());
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> start_encrypt_share =
+		std::chrono::high_resolution_clock::now();
+	std::vector<Ciphertext> encrypt_share_input_data;
+	encrypt_file(keypair, share_input_data, encrypt_share_input_data);
+	std::chrono::time_point<std::chrono::high_resolution_clock> end_encrypt_share =
+		std::chrono::high_resolution_clock::now();
+	std::cout << "Encrypt share time: "
+			  << std::chrono::duration_cast<std::chrono::milliseconds>(end_encrypt_share - start_encrypt_share).count()
+			  << " milliseconds" << std::endl;
 
 	std::array<std::pair<std::string, std::vector<std::atomic<bool>>>, 3> progress;
 	progress[0].first = "Encrypt";
@@ -327,8 +383,15 @@ int main(int argc, char** argv) {
 			encrypt_file(keypair, divide_input_data[i].second, encrypt_input_data);
 			progress[0].second[i] = true;
 
+			std::pair<
+				std::vector<std::reference_wrapper<const Ciphertext>>,
+				std::vector<std::reference_wrapper<const Ciphertext>>>
+				format_input_data;
+			problem->format(
+				divide_input_data[i].first, encrypt_share_input_data, encrypt_input_data, format_input_data
+			);
 			std::vector<Ciphertext> encrypt_output_data;
-			problem->calculate(divide_input_data[i].first, keypair, encrypt_input_data, encrypt_output_data);
+			problem->calculate(divide_input_data[i].first, keypair, format_input_data, encrypt_output_data);
 			progress[1].second[i] = true;
 
 			decrypt_file(keypair, encrypt_output_data, partial_output_data[i]);
@@ -353,8 +416,8 @@ int main(int argc, char** argv) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 		std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
-		std::cout << progress[i].first << " time: "
-				  << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+		std::cout << progress[i].first
+				  << " time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 				  << " milliseconds" << std::endl;
 	}
 	std::chrono::time_point<std::chrono::high_resolution_clock> total_end = std::chrono::high_resolution_clock::now();

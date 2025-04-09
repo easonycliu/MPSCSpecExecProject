@@ -256,6 +256,99 @@ public:
 	}
 };
 
+class MatrixMultiply : public Problem {
+public:
+	MatrixMultiply() = default;
+
+	void divide(
+		std::size_t workers, std::size_t problem_size, const std::vector<int>& input_data,
+		std::vector<int>& share_input_data, std::vector<std::pair<std::size_t, std::vector<int>>>& divide_input_data
+	) override {
+		if (input_data.size() != problem_size * problem_size * 2) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		share_input_data.clear();
+		share_input_data.insert(
+			share_input_data.end(), input_data.begin() + problem_size * problem_size, input_data.end()
+		);
+		divide_input_data.clear();
+		std::size_t rows_per_worker = problem_size / workers + std::size_t(problem_size % workers != 0);
+		for (std::size_t i = 0; i < workers; ++i) {
+			std::size_t start = i * rows_per_worker * problem_size;
+			std::size_t end = std::min(start + rows_per_worker * problem_size, problem_size * problem_size);
+			if ((end - start) % problem_size != 0) {
+				std::cerr << "Input data size does not match problem size." << std::endl;
+				return;
+			}
+			std::vector<int> chunk(input_data.begin() + start, input_data.begin() + end);
+			divide_input_data.emplace_back((end - start) / problem_size, std::move(chunk));
+		}
+	}
+
+	void format(
+		std::size_t problem_size, const std::vector<Ciphertext>& share_input_data,
+		const std::vector<Ciphertext>& private_input_data,
+		std::pair<
+			std::vector<std::reference_wrapper<const Ciphertext>>,
+			std::vector<std::reference_wrapper<const Ciphertext>>>& format_input_data
+	) override {
+		std::size_t matrix_size = std::sqrt(share_input_data.size());
+		if (share_input_data.size() != matrix_size * matrix_size) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		if (private_input_data.size() != problem_size * matrix_size) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		for (std::size_t i = 0; i < private_input_data.size(); ++i) {
+			format_input_data.first.emplace_back(private_input_data[i]);
+		}
+		for (std::size_t j = 0; j < share_input_data.size(); ++j) {
+			format_input_data.second.emplace_back(share_input_data[j]);
+		}
+	}
+
+	void calculate(
+		std::size_t problem_size, FHE_KeyPair& keypair,
+		const std::pair<
+			std::vector<std::reference_wrapper<const Ciphertext>>,
+			std::vector<std::reference_wrapper<const Ciphertext>>>& input_data,
+		std::vector<Ciphertext>& output_data
+	) override {
+		std::size_t matrix_size = std::sqrt(input_data.second.size());
+		if (input_data.second.size() != matrix_size * matrix_size) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		if (input_data.first.size() != problem_size * matrix_size) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+
+		output_data.resize(
+			problem_size * matrix_size, to_ciphertext(keypair, 0).mul(keypair.pk, to_ciphertext(keypair, 1))
+		);
+		for (std::size_t i = 0; i < problem_size; ++i) {
+			for (std::size_t j = 0; j < matrix_size; ++j) {
+				for (std::size_t k = 0; k < matrix_size; ++k) {
+					output_data[i * matrix_size + j] += input_data.first[i * matrix_size + k].get().mul(
+						keypair.pk, input_data.second[k * matrix_size + j].get()
+					);
+				}
+			}
+		}
+	}
+
+	void aggregate(const std::vector<std::vector<int>>& partial_output_data, std::vector<int>& output_data) override {
+		output_data.clear();
+		for (const std::vector<int>& one_partial_output_data : partial_output_data) {
+			output_data.insert(output_data.end(), one_partial_output_data.begin(), one_partial_output_data.end());
+		}
+	}
+};
+
 // Summation Logic Using MapReduce (Parallelized)
 void pmpspdz_sum(
 	std::size_t problem_size, FHE_KeyPair& keypair, const std::vector<Ciphertext>& input_data,
@@ -429,6 +522,8 @@ int main(int argc, char** argv) {
 		problem = std::make_unique<VectorMultiply>();
 	} else if (strcmp(problem_name, "pmpspdz_matrix_vector_multiply") == 0) {
 		problem = std::make_unique<MatrixVectorMultiply>();
+	} else if (strcmp(problem_name, "pmpspdz_matrix_multiply") == 0) {
+		problem = std::make_unique<MatrixMultiply>();
 	} else {
 		std::cerr << "Unknown problem name: " << problem_name << std::endl;
 		return 1;

@@ -12,7 +12,7 @@
 #include <string>
 #include <thread>
 
-#include "mapreduce.hpp"
+#include "util.hpp"
 #include "util/binaryfile.hpp"
 
 double ckks_scale = std::pow(2.0, 40);
@@ -429,13 +429,9 @@ void encrypt_file(
 		item.reserve(context, context_data->parms_id(), 2);
 	}
 	std::cerr << "Encrypting " << input_data.size() << " items" << std::endl;
-	MapReduce::map<T, seal::Ciphertext>(
-		input_data, output_data,
-		[&](const T& input, seal::Ciphertext& output) {
-			to_ciphertext(context_data, encryptor, encoder, input, output, level);
-		},
-		1
-	);
+	for (std::size_t i = 0; i != input_data.size(); i++) {
+		to_ciphertext(context_data, encryptor, encoder, input_data[i], output_data[i], level);
+	}
 }
 
 template <typename T>
@@ -545,6 +541,7 @@ int main(int argc, char** argv) {
 	std::chrono::time_point<std::chrono::high_resolution_clock> total_start = std::chrono::high_resolution_clock::now();
 	for (std::size_t i = 0; i < progress.size(); ++i) {
 		std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
+		double start_cpu_time = get_cpu_time_ms();
 		while (true) {
 			bool done = true;
 			for (std::size_t j = 0; j < thread_num; ++j) {
@@ -558,7 +555,11 @@ int main(int argc, char** argv) {
 			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
+		double end_cpu_time = get_cpu_time_ms();
 		std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
+		std::cout << progress[i].first
+				  << " cpu time: " << end_cpu_time - start_cpu_time << " milliseconds"
+				  << std::endl;
 		std::cout << progress[i].first
 				  << " time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 				  << " milliseconds" << std::endl;

@@ -14,7 +14,7 @@
 #include "Math/bigint.h"
 #include "Math/modp.hpp"
 #include "Tools/random.h"
-#include "mapreduce.hpp"
+#include "util.hpp"
 
 class Problem {
 public:
@@ -435,6 +435,7 @@ int main(int argc, char** argv) {
 	std::chrono::time_point<std::chrono::high_resolution_clock> total_start = std::chrono::high_resolution_clock::now();
 	for (std::size_t i = 0; i < progress.size(); ++i) {
 		std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
+		double start_cpu_time = get_cpu_time_ms();
 		while (true) {
 			bool done = true;
 			for (std::size_t j = 0; j < thread_num; ++j) {
@@ -448,7 +449,11 @@ int main(int argc, char** argv) {
 			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
+		double end_cpu_time = get_cpu_time_ms();
 		std::chrono::time_point<std::chrono::high_resolution_clock> end = std::chrono::high_resolution_clock::now();
+		std::cout << progress[i].first
+				  << " cpu time: " << end_cpu_time - start_cpu_time << " milliseconds"
+				  << std::endl;
 		std::cout << progress[i].first
 				  << " time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 				  << " milliseconds" << std::endl;

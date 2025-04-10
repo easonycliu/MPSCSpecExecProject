@@ -12,6 +12,8 @@
 
 #include "emp-sh2pc/emp-sh2pc.h"
 
+#include "util.hpp"
+
 using namespace emp;
 
 template <std::size_t width, std::size_t bs>
@@ -305,6 +307,8 @@ int main(int argc, char** argv) {
 	NetIO io(party == ALICE ? nullptr : other_ip, port, true);
 	setup_semi_honest(&io, party);
 
+	double start_cpu_time = get_cpu_time_ms();
+
 	std::chrono::high_resolution_clock::time_point encrypt_start = std::chrono::high_resolution_clock::now();
 	std::vector<Integer> input_data_encrypt;
 	encrypt_file(party, get_other_input_size(party, problem_name, problem_size), io, input_data, input_data_encrypt);
@@ -341,6 +345,9 @@ int main(int argc, char** argv) {
 	std::cout << "Total time: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(decrypt_end - encrypt_start).count() << " ms"
 			  << std::endl;
+
+	double end_cpu_time = get_cpu_time_ms();
+	std::cout << "Total cpu time: " << end_cpu_time - start_cpu_time << " ms" << std::endl;
 
 	write_to_file<width, bs>(output_file, output_data);
 }

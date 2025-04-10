@@ -13,6 +13,8 @@
 #include "Math/modp.hpp"
 #include "Tools/random.h"
 
+#include "util.hpp"
+
 Ciphertext to_ciphertext(FHE_KeyPair& keypair, int value) {
 	Plaintext_mod_prime plaintext(keypair.pk.get_params().get_plaintext_field_data<FFT_Data>());
 	plaintext.assign_constant(value);
@@ -195,6 +197,8 @@ int main(int argc, char** argv) {
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
 			  << std::endl;
 
+	double start_calc_cpu_time = get_cpu_time_ms();
+
 	std::vector<Ciphertext> output_data_encrypt;
 	if (strcmp(problem_name, "mpspdz_matrix_multiply") == 0) {
 		mpspdz_matrix_multiply(problem_size, keypair, input_data_encrypt, output_data_encrypt);
@@ -205,7 +209,10 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	double end_calc_cpu_time = get_cpu_time_ms();
+
 	std::chrono::high_resolution_clock::time_point calc_end = std::chrono::high_resolution_clock::now();
+	std::cout << "Calc cpu time: " << end_calc_cpu_time - start_calc_cpu_time << " ms" << std::endl;
 	std::cout << "Calc time: " << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end - encrypt_end).count()
 			  << " ms" << std::endl;
 

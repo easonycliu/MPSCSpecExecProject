@@ -22,7 +22,6 @@ log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
 MAGE=${project_dir}/install/tools/mage
-MPSPDZ_UTILS=${project_dir}/install/tools/pmpspdz_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
 
@@ -52,6 +51,13 @@ for flag in "$@"; do
 	esac
 done
 
+target_name=pmpspdz_utils
+if [ "${thread_num}" == "1" ]; then
+	target_name=mpspdz_utils
+	thread_num=
+fi
+MPSPDZ_UTILS=${project_dir}/install/tools/${target_name}
+
 sync
 echo 3 | tee /proc/sys/vm/drop_caches
 
@@ -75,7 +81,6 @@ else
 fi
 
 rss_log_file=${log_dir}/${workload}_${input_size}.rss
-target_name="pmpspdz_utils"
 
 touch ${rss_log_file}
 echo "Timestamp,            RSS (MB)" > "$rss_log_file"

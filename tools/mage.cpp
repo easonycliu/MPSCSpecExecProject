@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <fstream>
 #include <string>
 
 #include "addr.hpp"
@@ -35,6 +36,26 @@ using mage::protocols::EngineOptions;
 using mage::protocols::RegisteredProtocol;
 using mage::util::Registry;
 
+double get_cpu_time_ms() {
+	pid_t pid = getpid();
+    std::ifstream stat_file("/proc/" + std::to_string(pid) + "/stat");
+    if (!stat_file.is_open()) {
+        throw std::runtime_error("Failed to open /proc/[pid]/stat");
+    }
+
+    std::string token;
+    long utime_ticks = 0, stime_ticks = 0;
+    for (int i = 1; i <= 15; ++i) {
+        stat_file >> token;
+        if (i == 14) utime_ticks = std::stol(token);
+        if (i == 15) stime_ticks = std::stol(token);
+    }
+
+    long ticks_per_sec = sysconf(_SC_CLK_TCK);
+    double total_ms = (utime_ticks + stime_ticks) * 1000.0 / ticks_per_sec;
+    return total_ms;
+}
+
 int main(int argc, char** argv) {
 	if (argc != 6) {
 		std::cerr << "Usage: " << argv[0] << " protocol config.yaml party_id worker_id program_name" << std::endl;
@@ -42,6 +63,7 @@ int main(int argc, char** argv) {
 	}
 
 	std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+	double start_cpu_time = get_cpu_time_ms();
 
 	/* Parse the protocol name. */
 
@@ -99,7 +121,9 @@ int main(int argc, char** argv) {
 	const RegisteredProtocol& protocol = *prot_ptr;
 	protocol(args);
 
+	double end_cpu_time = get_cpu_time_ms();
 	std::chrono::time_point<std::chrono::steady_clock> end = std::chrono::steady_clock::now();
+	std::cout << "Total cpu time: " << end_cpu_time - start_cpu_time << " ms" << std::endl;
 	std::cout << "Total time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms"
 			  << std::endl;
 

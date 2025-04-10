@@ -33,7 +33,7 @@
 #include <string>
 #include <thread>
 
-#include "mapreduce.hpp"
+#include "util.hpp"
 #include "util/binaryfile.hpp"
 
 double ckks_scale = std::pow(2.0, 40);
@@ -146,13 +146,9 @@ void encrypt_file(
 		item.reserve(context, context_data->parms_id(), 2);
 	}
 	std::cerr << "Encrypting " << input_data.size() << " items" << std::endl;
-	MapReduce::map<T, seal::Ciphertext>(
-		input_data, output_data,
-		[&](const T& input, seal::Ciphertext& output) {
-			to_ciphertext(context_data, encryptor, encoder, input, output, level);
-		},
-		1
-	);
+	for (std::size_t i = 0; i != input_data.size(); i++) {
+		to_ciphertext(context_data, encryptor, encoder, input_data[i], output_data[i], level);
+	}
 }
 
 template <typename T>
@@ -380,6 +376,8 @@ int main(int argc, char** argv) {
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
 			  << std::endl;
 
+	double start_calc_cpu_time = get_cpu_time_ms();
+
 	std::vector<seal::Ciphertext> output_data_encrypt;
 	if (problem_name == "real_sum") {
 		real_sum(
@@ -406,7 +404,10 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	double end_calc_cpu_time = get_cpu_time_ms();
+
 	std::chrono::high_resolution_clock::time_point calc_end = std::chrono::high_resolution_clock::now();
+	std::cout << "Calc cpu time: " << end_calc_cpu_time - start_calc_cpu_time << " ms" << std::endl;
 	std::cout << "Calc time: " << std::chrono::duration_cast<std::chrono::milliseconds>(calc_end - encrypt_end).count()
 			  << " ms" << std::endl;
 

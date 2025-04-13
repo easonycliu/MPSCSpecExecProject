@@ -10,6 +10,7 @@ input_size=
 round_num=1
 mem_limit=
 workload=
+thread_num=1
 
 batch_size=1
 
@@ -25,7 +26,6 @@ log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
 MAGE=${project_dir}/install/tools/mage
-CKKS_UTILS=${project_dir}/install/tools/ckks_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
 
@@ -57,12 +57,24 @@ for flag in "$@"; do
 		--workload=*)
 			workload=$(echo $flag | awk -F = '{print $2}')
 			;;
+		--thread_num=*)
+			thread_num=$(echo $flag | awk -F = '{print $2}')
+			;;
 		*)
 			echo "Unknown command-line flag" $flag
 	esac
 done
 
 mkdir -p ${log_dir}
+
+target_name=pckks_utils
+problem_size=${input_size}
+if [ "${thread_num}" == "1" ]; then
+	target_name=ckks_utils
+	thread_num=
+	problem_size=${input_size}:${round_num}
+fi
+CKKS_UTILS=${project_dir}/install/tools/${target_name}
 
 sync
 echo 3 | tee /proc/sys/vm/drop_caches
@@ -74,6 +86,7 @@ echo Tool args: ${tool_args} | tee -a ${log_file}
 echo Input size: ${input_size} | tee -a ${log_file}
 echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
+echo Thread number: ${thread_num} | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then
 	tool_cmd="$OSPREY"
@@ -152,7 +165,7 @@ if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
 	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
 	mkswap /dev/sda2
 	swapon /dev/sda2
-	${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${input_size}:${round_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
+	${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${problem_size} ${thread_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
 	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
 elif [ "${tool}" == "mage" ]; then
 	page_shift=21

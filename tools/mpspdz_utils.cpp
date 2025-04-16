@@ -15,6 +15,8 @@
 
 #include "util.hpp"
 
+#include "memprog/watcher.hpp"
+
 Ciphertext to_ciphertext(FHE_KeyPair& keypair, int value) {
 	Plaintext_mod_prime plaintext(keypair.pk.get_params().get_plaintext_field_data<FFT_Data>());
 	plaintext.assign_constant(value);
@@ -196,6 +198,8 @@ int main(int argc, char** argv) {
 	std::cout << "Encrypt time: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
 			  << std::endl;
+
+	osprey::memprog::clear_stats();
 
 	double start_calc_cpu_time = get_cpu_time_ms();
 

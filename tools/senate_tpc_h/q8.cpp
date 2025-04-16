@@ -201,12 +201,12 @@ namespace senate_tpc_h_q8 {
 
 	template <typename T>
 	void keySort(std::vector<T>& row, int lo, int n, bool acc = true) {
-		if (n > 1) {
-			int m = n / 2;
-			keySort(row, lo, m, true);
-			keySort(row, lo + m, n - m, false);
-			keyMerge(row, lo, n, acc);
-		}
+		// if (n > 1) {
+		// 	int m = n / 2;
+		// 	keySort(row, lo, m, true);
+		// 	keySort(row, lo + m, n - m, false);
+		// 	keyMerge(row, lo, n, acc);
+		// }
 	}
 
 	inline irow_13 select_3(irow_13 A, irow_13 B, irow_13 C) {

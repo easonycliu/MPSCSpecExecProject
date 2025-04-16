@@ -36,6 +36,8 @@
 #include "util.hpp"
 #include "util/binaryfile.hpp"
 
+#include "memprog/watcher.hpp"
+
 double ckks_scale = std::pow(2.0, 40);
 
 template <std::size_t bs, typename T>
@@ -375,6 +377,8 @@ int main(int argc, char** argv) {
 	std::cout << "Encrypt time: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(encrypt_end - encrypt_start).count() << " ms"
 			  << std::endl;
+
+	osprey::memprog::clear_stats();
 
 	double start_calc_cpu_time = get_cpu_time_ms();
 

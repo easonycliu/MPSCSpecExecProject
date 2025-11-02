@@ -65,7 +65,7 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 
 emp-tool: $(DEP_INSTALL_DIR)/emp-tool osprey
 	cd $(PROJECT_DIR)/emp-tool && \
-		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
+		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DLIBBPF_PATH=$(PROJECT_DIR)/linux/tools/lib/bpf/libbpf.so && \
 		cmake --build $(DEP_BUILD_DIR)/emp-tool --verbose -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-tool
 
@@ -77,7 +77,9 @@ $(DEP_BUILD_DIR)/emp-tool: $(DEP_BUILD_DIR)
 
 emp-ot: $(DEP_INSTALL_DIR)/emp-ot osprey emp-tool
 	cd $(PROJECT_DIR)/emp-ot && \
-		cmake -B $(DEP_BUILD_DIR)/emp-ot -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" && \
+		cmake -B $(DEP_BUILD_DIR)/emp-ot \
+		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey \
+		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" -DLIBBPF_PATH=$(PROJECT_DIR)/linux/tools/lib/bpf/libbpf.so && \
 		cmake --build $(DEP_BUILD_DIR)/emp-ot -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-ot
 
@@ -90,8 +92,8 @@ $(DEP_BUILD_DIR)/emp-ot: $(DEP_BUILD_DIR)
 emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc osprey emp-tool emp-ot
 	cd $(PROJECT_DIR)/emp-sh2pc && \
 		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc \
-		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ \
-		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
+		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey \
+		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" -DLIBBPF_PATH=$(PROJECT_DIR)/linux/tools/lib/bpf/libbpf.so && \
 		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc --verbose -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/emp-sh2pc
 
@@ -103,7 +105,7 @@ $(DEP_BUILD_DIR)/emp-sh2pc: $(DEP_BUILD_DIR)
 
 MP-SPDZ: $(DEP_INSTALL_DIR)/MP-SPDZ libOTe osprey
 	cd $(PROJECT_DIR)/MP-SPDZ && \
-		make -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR) OSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
+		make -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR) OSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey LIBBPF_DIR=$(PROJECT_DIR)/linux/tools/lib/bpf && \
 		cp -r $(PROJECT_DIR)/MP-SPDZ/* $(DEP_INSTALL_DIR)/MP-SPDZ
 
 $(DEP_INSTALL_DIR)/MP-SPDZ: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/MP-SPDZ

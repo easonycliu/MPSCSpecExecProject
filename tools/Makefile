@@ -21,6 +21,7 @@ all: $(TOOLS_EXECUTABLES)
 
 $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools
 	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp \
+		-Wl,-rpath,$(PROJECT_DIR)/linux/tools/lib/bpf \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/yaml-cpp/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/tfhe/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/mage/lib \
@@ -29,6 +30,7 @@ $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/emp-tool/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/libOTe \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/MP-SPDZ \
+		-L$(PROJECT_DIR)/linux/tools/lib/bpf -l:libbpf.so \
 		-L$(PROJECT_DIR)/install/yaml-cpp/lib -l:libyaml-cpp.so \
 		-L$(PROJECT_DIR)/install/tfhe/lib -l:libtfhe-spqlios-fma.so \
 		-L$(PROJECT_DIR)/install/mage/lib -l:libmage.so \

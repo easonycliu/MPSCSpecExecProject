@@ -15,6 +15,8 @@
 #include "util.hpp"
 #include "util/binaryfile.hpp"
 
+#include "memprog/watcher.hpp"
+
 double ckks_scale = std::pow(2.0, 40);
 
 class Problem {
@@ -511,13 +513,19 @@ int main(int argc, char** argv) {
 	progress[1].second = std::vector<std::atomic<bool>>(thread_num);
 	progress[2].first = "Decrypt";
 	progress[2].second = std::vector<std::atomic<bool>>(thread_num);
-	std::vector<std::thread> threads(thread_num);
+	std::atomic<bool> calculate_start(false);
 	for (std::size_t i = 0; i < thread_num; ++i) {
-		threads.emplace_back([&, i]() {
+		std::thread([&, i]() {
 			std::vector<seal::Ciphertext> encrypt_input_data;
 			encrypt_file(std::get<0>(keypair), std::get<2>(keypair), divide_input_data[i].second, encrypt_input_data, level);
 			progress[0].second[i] = true;
 
+			while (!calculate_start.load()) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+
+			std::chrono::time_point<std::chrono::high_resolution_clock> start_calculate =
+				std::chrono::high_resolution_clock::now();
 			std::pair<
 				std::vector<std::reference_wrapper<const seal::Ciphertext>>,
 				std::vector<std::reference_wrapper<const seal::Ciphertext>>>
@@ -530,12 +538,18 @@ int main(int argc, char** argv) {
 				divide_input_data[i].first, std::get<0>(keypair), format_input_data, encrypt_output_data
 			);
 			progress[1].second[i] = true;
+			std::chrono::time_point<std::chrono::high_resolution_clock> end_calculate =
+				std::chrono::high_resolution_clock::now();
+			std::cerr << "Worker " << i << " at thread tid " << gettid()
+					  << " finished calculation in " << std::chrono::duration_cast<std::chrono::milliseconds>(
+						  end_calculate - start_calculate
+					  ).count() << " milliseconds" << std::endl;
 
 			decrypt_file(
 				std::get<0>(keypair), std::get<1>(keypair), encrypt_output_data, partial_output_data[i]
 			);
 			progress[2].second[i] = true;
-		});
+		}).detach();
 	}
 
 	std::chrono::time_point<std::chrono::high_resolution_clock> total_start = std::chrono::high_resolution_clock::now();
@@ -563,17 +577,16 @@ int main(int argc, char** argv) {
 		std::cout << progress[i].first
 				  << " time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
 				  << " milliseconds" << std::endl;
+
+		if (progress[i].first == "Encrypt") {
+			osprey::memprog::clear_stats();
+			calculate_start.store(true);
+		}
 	}
 	std::chrono::time_point<std::chrono::high_resolution_clock> total_end = std::chrono::high_resolution_clock::now();
 	std::cout << "Total time: "
 			  << std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start).count()
 			  << " milliseconds" << std::endl;
-
-	for (auto& thread : threads) {
-		if (thread.joinable()) {
-			thread.join();
-		}
-	}
 
 	std::vector<double> output_data;
 	problem->aggregate(partial_output_data, output_data);

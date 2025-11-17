@@ -153,7 +153,7 @@ pushd ${playground_dir}
 
 $EXAMPLE_INPUT ${workload} ${input_size} 1 random
 
-swapoff /dev/sda2
+swapoff /dev/nvme0n1p2
 
 monitor_rss &
 
@@ -163,8 +163,8 @@ if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
 	# echo nop | $SUDO tee /sys/kernel/tracing/current_tracer
 	# echo 1 | $SUDO tee /sys/kernel/tracing/events/tlb/tlb_flush/enable
 	# echo 1 | $SUDO tee /sys/kernel/tracing/tracing_on
-	mkswap /dev/sda2
-	swapon /dev/sda2
+	mkswap /dev/nvme0n1p2
+	swapon /dev/nvme0n1p2
 	${tool_cmd} ${tool_args} $CKKS_UTILS ${workload} ${problem_size} ${thread_num} ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}
 	# echo 0 | $SUDO tee /sys/kernel/tracing/tracing_on
 elif [ "${tool}" == "mage" ]; then
@@ -187,7 +187,7 @@ parties:
           internal_port: 56000
           external_host: localhost
           external_port: 57000
-          storage_path: /dev/sdb2
+          storage_path: /dev/nvme0n1p2
 EOF
 	$PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
 	${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}

@@ -189,8 +189,27 @@ parties:
           external_port: 57000
           storage_path: /dev/nvme0n1p2
 EOF
+	for i in $(seq 1 $(( thread_num - 1 )) ); do
+		cat <<EOF >>config.yaml
+        - internal_host: localhost
+          internal_port: $(( 56000 + i ))
+          external_host: localhost
+          external_port: $(( 57000 + i ))
+          storage_path: /dev/nvme0n1p2
+EOF
+	done
+	wait_pids=()
 	$PLANNER ${workload} ckks config.yaml 0 0 ${input_size} | tee -a ${log_file}
-	${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file}
+	${tool_cmd} ckks config.yaml 0 0 ${workload}_${input_size} | tee -a ${log_file} &
+	wait_pids+=($!)
+	for i in $(seq 1 $(( thread_num - 1 )) ); do
+		$PLANNER ${workload} ckks config.yaml 0 $i ${input_size} | tee -a ${log_file}
+		${tool_cmd} ckks config.yaml 0 $i ${workload}_${input_size} | tee -a ${log_file} &
+		wait_pids+=($!)
+	done
+	for pid in ${wait_pids[@]}; do
+		wait $pid
+	done
 fi
 echo real output is $(od -An -t fD ${workload}_${input_size}_0_garbler.output | tail -n 2)
 

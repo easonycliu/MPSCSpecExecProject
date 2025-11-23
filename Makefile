@@ -143,6 +143,8 @@ $(DEP_BUILD_DIR):
 
 install_deps: fastsudo
 	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev cgroup-tools binutils-dev libreadline-dev llvm libsodium-dev libgmp-dev
+	sudo apt install -y libboost-program-options-dev libboost-random-dev
+	cd $(PROJECT_DIR)/linux/tools/bpf/bpftool && make
 	cd $(PROJECT_DIR)/osprey && ./install_deps.sh --install-osprey-deps
 
 clean:

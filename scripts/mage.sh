@@ -127,9 +127,9 @@ monitor_rss() {
 
 if [ "${mem_limit}" != "" ]; then
 	cgcreate -g memory:/osprey
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgcreate -g memory:/osprey"
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo cgcreate -g memory:/osprey"
 	cgset -r memory.high="${mem_limit}M" osprey
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgset -r memory.high=${mem_limit}M osprey"
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo cgset -r memory.high=${mem_limit}M osprey"
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -149,7 +149,7 @@ parties:
           internal_port: 56000
           external_host: ${other_ip}
           external_port: 54323
-          storage_path: /dev/sdb2
+          storage_path: /dev/nvme0n1p2
 
     # Garbler
     - workers:
@@ -157,38 +157,40 @@ parties:
           internal_port: 50000
           external_host: ${this_ip}
           external_port: 54322
-          storage_path: /dev/sdb2
+          storage_path: /dev/nvme0n1p2
 EOF
 
-swapoff /dev/sdb2
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapoff /dev/sdb2"
+swapoff /dev/nvme0n1p2
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo swapoff /dev/nvme0n1p2"
 
-scp -i /home/yicheng/.ssh/id_rsa ${playground_dir}/config.yaml yicheng@${other_ip}:${playground_dir}/config.yaml
+scp -i /home/easonliu/.ssh/id_ed25519 ${playground_dir}/config.yaml easonliu@${other_ip}:${playground_dir}/config.yaml
 
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
 
 $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size} | tee -a ${log_file}.evaluator
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size}" | tee -a ${log_file}.garbler
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir}; $PLANNER ${workload} halfgates ${playground_dir}/config.yaml 0 0 ${input_size}" | tee -a ${log_file}.garbler
 
 monitor_rss &
 
+set -x
 if [ "${tool}" == "osprey" -o "${tool}" == "baseline" ]; then
-	mkswap /dev/sdb2
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo mkswap /dev/sdb2"
-	swapon /dev/sdb2
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapon /dev/sdb2"
+	mkswap /dev/nvme0n1p2
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo mkswap /dev/nvme0n1p2"
+	swapon /dev/nvme0n1p2
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo swapon /dev/nvme0n1p2"
 
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; fastsudo ${tool_cmd} ${tool_args_evaluator} ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir}; fastsudo ${tool_cmd} ${tool_args_evaluator} ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
 	sleep 1
 	${tool_cmd} ${tool_args_garbler} ${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}.garbler
 elif [ "${tool}" == "mage" ]; then
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; fastsudo ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir}; fastsudo ${MAGE} halfgates ${playground_dir}/config.yaml 0 0 ${workload}_${input_size}" | tee -a ${log_file}.evaluator &
 	sleep 1
 	${MAGE} halfgates ${playground_dir}/config.yaml 1 0 ${workload}_${input_size} | tee -a ${log_file}.garbler
 fi
+set +x
 
 mv ${workload}_${input_size}_0.output ${workload}_${input_size}_0_garbler.output
 
@@ -198,7 +200,7 @@ popd
 
 if [ "${mem_limit}" != "" ]; then
 	cgdelete memory:/osprey
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgdelete memory:/osprey"
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo cgdelete memory:/osprey"
 fi
 
 stty sane

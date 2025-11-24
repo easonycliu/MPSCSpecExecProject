@@ -11,9 +11,9 @@ ifndef JOBS
 JOBS := $(shell nproc)
 endif
 
-.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ show fastsudo
+.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ show fastsudo
 
-all: yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ tools
+all: yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
 
 mage: yaml-cpp tfhe oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
@@ -24,7 +24,7 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 $(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
 	mkdir $@ || true
 
-tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool emp-ot emp-sh2pc libOTe MP-SPDZ
+tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool libOTe MP-SPDZ
 	make -C $(PROJECT_DIR)/tools -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
@@ -63,44 +63,16 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
-emp-tool: $(DEP_INSTALL_DIR)/emp-tool osprey
+emp-tool: $(DEP_INSTALL_DIR)/tools osprey
 	cd $(PROJECT_DIR)/emp-tool && \
-		cmake -B $(DEP_BUILD_DIR)/emp-tool -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey -DLIBBPF_PATH=$(PROJECT_DIR)/linux/tools/lib/bpf/libbpf.so && \
-		cmake --build $(DEP_BUILD_DIR)/emp-tool --verbose -j$(JOBS) && \
-		cmake --install $(DEP_BUILD_DIR)/emp-tool
+		cmake -B $(DEP_BUILD_DIR)/emp-tool -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
+		cmake --build $(DEP_BUILD_DIR)/emp-tool && \
+		cp $(DEP_BUILD_DIR)/emp-tool/emp_utils_* $(DEP_INSTALL_DIR)/tools/ || true
 
 $(DEP_INSTALL_DIR)/emp-tool: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-tool
 	mkdir $@ || true
 
 $(DEP_BUILD_DIR)/emp-tool: $(DEP_BUILD_DIR)
-	mkdir $@ || true
-
-emp-ot: $(DEP_INSTALL_DIR)/emp-ot osprey emp-tool
-	cd $(PROJECT_DIR)/emp-ot && \
-		cmake -B $(DEP_BUILD_DIR)/emp-ot \
-		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey \
-		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(PROJECT_DIR)/osprey" -DLIBBPF_PATH=$(PROJECT_DIR)/linux/tools/lib/bpf/libbpf.so && \
-		cmake --build $(DEP_BUILD_DIR)/emp-ot -j$(JOBS) && \
-		cmake --install $(DEP_BUILD_DIR)/emp-ot
-
-$(DEP_INSTALL_DIR)/emp-ot: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-ot
-	mkdir $@ || true
-
-$(DEP_BUILD_DIR)/emp-ot: $(DEP_BUILD_DIR)
-	mkdir $@ || true
-
-emp-sh2pc: $(DEP_INSTALL_DIR)/emp-sh2pc osprey emp-tool emp-ot
-	cd $(PROJECT_DIR)/emp-sh2pc && \
-		cmake -B $(DEP_BUILD_DIR)/emp-sh2pc \
-		-DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey \
-		-DCMAKE_PREFIX_PATH="$(DEP_INSTALL_DIR)/emp-tool;$(DEP_INSTALL_DIR)/emp-ot" -DLIBBPF_PATH=$(PROJECT_DIR)/linux/tools/lib/bpf/libbpf.so && \
-		cmake --build $(DEP_BUILD_DIR)/emp-sh2pc --verbose -j$(JOBS) && \
-		cmake --install $(DEP_BUILD_DIR)/emp-sh2pc
-
-$(DEP_INSTALL_DIR)/emp-sh2pc: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/emp-sh2pc
-	mkdir $@ || true
-
-$(DEP_BUILD_DIR)/emp-sh2pc: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
 MP-SPDZ: $(DEP_INSTALL_DIR)/MP-SPDZ libOTe osprey

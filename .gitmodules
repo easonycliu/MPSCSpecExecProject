@@ -18,13 +18,7 @@
 	url = git@github.com:easonycliu/MPSCSpecExecLinux.git
 [submodule "emp-tool"]
 	path = emp-tool
-	url = git@github.com:easonycliu/MPSCSpecExecEMPTool.git
-[submodule "emp-ot"]
-	path = emp-ot
-	url = git@github.com:easonycliu/MPSCSpecExecEMPOT.git
-[submodule "emp-sh2pc"]
-	path = emp-sh2pc
-	url = git@github.com:easonycliu/MPSCSpecExecEMPSh2PC.git
+	url = git@github.com:easonycliu/FastSMPCProject.git
 [submodule "MP-SPDZ"]
 	path = MP-SPDZ
 	url = git@github.com:easonycliu/MPSCSpecExecMPSPDZ.git

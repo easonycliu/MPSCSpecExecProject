@@ -44,6 +44,161 @@ public:
 	virtual void aggregate(const std::vector<std::vector<double>>& partial_output_data, std::vector<double>& output_data) = 0;
 };
 
+class Sum : public Problem {
+public:
+	Sum() = default;
+
+	void divide(
+		std::size_t workers, std::size_t problem_size, const std::vector<double>& input_data,
+		std::vector<double>& share_input_data, std::vector<std::pair<std::size_t, std::vector<double>>>& divide_input_data
+	) override {
+		if (input_data.size() != problem_size) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		share_input_data.clear();
+		divide_input_data.clear();
+		std::size_t vector_size_per_worker = problem_size / workers + std::size_t(problem_size % workers != 0);
+		for (std::size_t i = 0; i < workers; ++i) {
+			std::size_t start = i * vector_size_per_worker;
+			std::size_t end = std::min(start + vector_size_per_worker, problem_size);
+			std::vector<double> chunk(input_data.begin() + start, input_data.begin() + end);
+			divide_input_data.emplace_back(end - start, std::move(chunk));
+		}
+	}
+
+	void format(
+		std::size_t problem_size, const std::vector<seal::Ciphertext>& share_input_data,
+		const std::vector<seal::Ciphertext>& private_input_data,
+		std::pair<
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>,
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>>& format_input_data
+	) override {
+		if (private_input_data.size() != problem_size) {
+			std::cerr << "Input data size must match problem size." << std::endl;
+			return;
+		}
+
+		for (std::size_t i = 0; i < problem_size; ++i) {
+			format_input_data.first.emplace_back(private_input_data[i]);
+		}
+	}
+
+	void calculate(
+		std::size_t problem_size, seal::EncryptionParameters& parms,
+		const std::pair<
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>,
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>>& input_data,
+		std::vector<seal::Ciphertext>& output_data
+	) override {
+		if (input_data.first.size() != problem_size) {
+			std::cerr << "Input data size must match problem size." << std::endl;
+			return;
+		}
+		if (input_data.first.size() == 0) {
+			return;
+		}
+
+		seal::SEALContext context(parms);
+		seal::Evaluator evaluator(context);
+
+		output_data.clear();
+		output_data.resize(1);
+		output_data[0] = input_data.first[0];
+		for (std::size_t i = 1; i < problem_size; ++i) {
+			evaluator.add_inplace(output_data[0], input_data.first[i].get());
+		}
+	}
+
+	void aggregate(const std::vector<std::vector<double>>& partial_output_data, std::vector<double>& output_data) override {
+		output_data.resize(1, 0);
+		for (const std::vector<double>& one_partial_output_data : partial_output_data) {
+			for (double item : one_partial_output_data) {
+				output_data[0] += item;
+			}
+		}
+	}
+};
+
+class Statistics : public Problem {
+public:
+	Statistics() = default;
+
+	void divide(
+		std::size_t workers, std::size_t problem_size, const std::vector<double>& input_data,
+		std::vector<double>& share_input_data, std::vector<std::pair<std::size_t, std::vector<double>>>& divide_input_data
+	) override {
+		if (input_data.size() != problem_size) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		share_input_data.clear();
+		divide_input_data.clear();
+		std::size_t vector_size_per_worker = problem_size / workers + std::size_t(problem_size % workers != 0);
+		for (std::size_t i = 0; i < workers; ++i) {
+			std::size_t start = i * vector_size_per_worker;
+			std::size_t end = std::min(start + vector_size_per_worker, problem_size);
+			std::vector<double> chunk(input_data.begin() + start, input_data.begin() + end);
+			divide_input_data.emplace_back(end - start, std::move(chunk));
+		}
+	}
+
+	void format(
+		std::size_t problem_size, const std::vector<seal::Ciphertext>& share_input_data,
+		const std::vector<seal::Ciphertext>& private_input_data,
+		std::pair<
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>,
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>>& format_input_data
+	) override {
+		if (private_input_data.size() != problem_size) {
+			std::cerr << "Input data size must match problem size." << std::endl;
+			return;
+		}
+
+		for (std::size_t i = 0; i < problem_size; ++i) {
+			format_input_data.first.emplace_back(private_input_data[i]);
+		}
+	}
+
+	void calculate(
+		std::size_t problem_size, seal::EncryptionParameters& parms,
+		const std::pair<
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>,
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>>& input_data,
+		std::vector<seal::Ciphertext>& output_data
+	) override {
+		if (input_data.first.size() != problem_size) {
+			std::cerr << "Input data size must match problem size." << std::endl;
+			return;
+		}
+		if (input_data.first.size() == 0) {
+			return;
+		}
+
+		seal::SEALContext context(parms);
+		seal::Evaluator evaluator(context);
+
+		output_data.clear();
+		output_data.resize(2);
+		output_data[0] = input_data.first[0];
+		evaluator.square(input_data.first[0], output_data[1]);
+		for (std::size_t i = 1; i < problem_size; ++i) {
+			evaluator.add_inplace(output_data[0], input_data.first[i].get());
+			seal::Ciphertext temp_square;
+			evaluator.square(input_data.first[i].get(), temp_square);
+			evaluator.add_inplace(output_data[1], temp_square);
+		}
+	}
+
+	void aggregate(const std::vector<std::vector<double>>& partial_output_data, std::vector<double>& output_data) override {
+		output_data.resize(2, 0);
+		for (const std::vector<double>& one_partial_output_data : partial_output_data) {
+			output_data[0] += one_partial_output_data[0];
+			output_data[1] += one_partial_output_data[1];
+		}
+	}
+};
+
 class VectorMultiply : public Problem {
 public:
 	VectorMultiply() = default;
@@ -323,6 +478,132 @@ public:
 	}
 };
 
+template <std::size_t tile_size>
+class TiledMatrixMultiply : public Problem {
+public:
+	TiledMatrixMultiply() = default;
+
+	void divide(
+		std::size_t workers, std::size_t problem_size, const std::vector<double>& input_data,
+		std::vector<double>& share_input_data, std::vector<std::pair<std::size_t, std::vector<double>>>& divide_input_data
+	) override {
+		if (input_data.size() != problem_size * problem_size * 2) {
+			std::cerr << "Input data size does not match problem size." << std::endl;
+			return;
+		}
+		share_input_data.clear();
+		share_input_data.insert(share_input_data.end(), input_data.begin() + problem_size * problem_size, input_data.end());
+		divide_input_data.clear();
+		std::size_t rows_per_worker = problem_size / workers + std::size_t(problem_size % workers != 0);
+		if (rows_per_worker % tile_size != 0) {
+			std::cerr << "Rows per worker must be multiple of tile size." << std::endl;
+			return;
+		}
+
+		for (std::size_t i = 0; i < workers; ++i) {
+			std::size_t start = i * rows_per_worker * problem_size;
+			std::size_t end = std::min(start + rows_per_worker * problem_size, problem_size * problem_size);
+			if ((end - start) % problem_size != 0) {
+				std::cerr << "Input data size does not match problem size." << std::endl;
+				return;
+			}
+			std::vector<double> chunk(input_data.begin() + start, input_data.begin() + end);
+			divide_input_data.emplace_back((end - start) / problem_size, std::move(chunk));
+		}
+	}
+
+	void format(
+		std::size_t problem_size, const std::vector<seal::Ciphertext>& share_input_data,
+		const std::vector<seal::Ciphertext>& private_input_data,
+		std::pair<
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>,
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>>& format_input_data
+	) override {
+		std::size_t matrix_size = std::sqrt(share_input_data.size());
+		if (share_input_data.size() != matrix_size * matrix_size) {
+			std::cerr << "Input data of second operand size does not match problem size." << std::endl;
+			return;
+		}
+		if (private_input_data.size() != problem_size * matrix_size) {
+			std::cerr << "Input data of first operand size does not match problem size." << std::endl;
+			return;
+		}
+		for (std::size_t i = 0; i < private_input_data.size(); ++i) {
+			format_input_data.first.emplace_back(private_input_data[i]);
+		}
+		for (std::size_t j = 0; j < share_input_data.size(); ++j) {
+			format_input_data.second.emplace_back(share_input_data[j]);
+		}
+	}
+
+	void calculate(
+		std::size_t problem_size, seal::EncryptionParameters& parms,
+		const std::pair<
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>,
+			std::vector<std::reference_wrapper<const seal::Ciphertext>>>& input_data,
+		std::vector<seal::Ciphertext>& output_data
+	) override {
+		std::size_t matrix_size = std::sqrt(input_data.second.size());
+		if (input_data.second.size() != matrix_size * matrix_size) {
+			std::cerr << "Input data of second operand size does not match problem size." << std::endl;
+			return;
+		}
+		if (input_data.first.size() != problem_size * matrix_size) {
+			std::cerr << "Input data of first operand size does not match problem size." << std::endl;
+			return;
+		}
+		if (input_data.first.size() == 0 || input_data.second.size() == 0) {
+			return;
+		}
+
+		seal::SEALContext context(parms);
+		seal::Evaluator evaluator(context);
+
+		output_data.clear();
+		output_data.resize(problem_size * matrix_size);
+
+		for (std::size_t batch_row_a = 0; batch_row_a < problem_size; batch_row_a += tile_size) {
+			for (std::size_t batch_col_b = 0; batch_col_b < matrix_size; batch_col_b += tile_size) {
+				for (std::size_t batch_cols_a_rows_b = 0; batch_cols_a_rows_b < matrix_size; batch_cols_a_rows_b += tile_size) {
+					for (std::size_t row_a = batch_row_a; row_a < std::min(batch_row_a + tile_size, problem_size); row_a++) {
+						for (std::size_t col_b = batch_col_b; col_b < std::min(batch_col_b + tile_size, matrix_size); col_b++) {
+							std::size_t i_batch = (row_a - batch_row_a) * tile_size + (col_b - batch_col_b);
+							std::size_t dot_product_size = std::min(tile_size, matrix_size - batch_cols_a_rows_b);
+							seal::Ciphertext dot_product_result;
+							evaluator.multiply(
+								input_data.first[row_a * matrix_size + batch_cols_a_rows_b],
+								input_data.second[col_b * matrix_size + batch_cols_a_rows_b], dot_product_result
+							);
+							for (std::size_t i = 1; i < dot_product_size; i++) {
+								seal::Ciphertext temp;
+								evaluator.multiply(
+									input_data.first[row_a * matrix_size + batch_cols_a_rows_b + i],
+									input_data.second[(batch_cols_a_rows_b + i) * matrix_size + col_b], temp
+								);
+								evaluator.add_inplace(dot_product_result, temp);
+							}
+							if (output_data[row_a * matrix_size + col_b].size() != 0) {
+								evaluator.add_inplace(output_data[row_a * matrix_size + col_b], dot_product_result);
+							} else {
+								output_data[row_a * matrix_size + col_b] = std::move(dot_product_result);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	void aggregate(const std::vector<std::vector<double>>& partial_output_data, std::vector<double>& output_data) override {
+		output_data.clear();
+		for (const std::vector<double>& one_partial_output_data : partial_output_data) {
+			output_data.insert(
+				output_data.end(), one_partial_output_data.begin(), one_partial_output_data.end()
+			);
+		}
+	}
+};
+
 template <std::size_t bs, typename T>
 bool read_from_file(const std::string& file, std::vector<T>& data) {
 	std::ifstream stream(file, std::ios::binary);
@@ -467,7 +748,13 @@ int main(int argc, char** argv) {
 
 	std::size_t level;
 	std::unique_ptr<Problem> problem;
-	if (problem_name == "real_vector_multiply") {
+	if (problem_name == "real_sum") {
+		level = 1;
+		problem = std::make_unique<Sum>();
+	} else if (problem_name == "real_statistics") {
+		level = 2;
+		problem = std::make_unique<Statistics>();
+	} else if (problem_name == "real_vector_multiply") {
 		level = 1;
 		problem = std::make_unique<VectorMultiply>();
 	} else if (problem_name == "real_matrix_vector_multiply") {
@@ -476,6 +763,9 @@ int main(int argc, char** argv) {
 	} else if (problem_name == "real_naive_matrix_multiply") {
 		level = 1;
 		problem = std::make_unique<MatrixMultiply>();
+	} else if (problem_name == "real_tiled_matrix_multiply") {
+		level = 1;
+		problem = std::make_unique<TiledMatrixMultiply<4>>();
 	} else {
 		std::cerr << "Unknown problem name" << std::endl;
 		return 1;

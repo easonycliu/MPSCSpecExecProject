@@ -27,7 +27,7 @@ tool_args_evaluator=
 log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
-SH2PC_UTILS=${project_dir}/install/tools/sh2pc_utils
+EMP_UTILS=${project_dir}/install/tools/emp_utils
 PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/install/tools/example_input
 
@@ -93,7 +93,7 @@ else
 fi
 
 rss_log_file=${log_dir}/${workload}_${input_size}.rss
-target_name="sh2pc_utils"
+target_name="emp_utils"
 
 touch ${rss_log_file}
 echo "Timestamp,            RSS (MB)" > "$rss_log_file"
@@ -101,7 +101,7 @@ echo "Timestamp,            RSS (MB)" > "$rss_log_file"
 monitor_rss() {
 	# Wait for the process to start
 	while true; do
-		PID=$(ps -a | grep "$target_name" | sort | tail -n 1 | awk '{print $1}')
+		PID=$(ps -a | grep -E "$target_name*" | sort | tail -n 1 | awk '{print $1}')
 		echo "PID: $PID"
 		if [ -n "$PID" ]; then
 			echo "Monitoring process $target_name with PID $PID"
@@ -125,9 +125,9 @@ monitor_rss() {
 
 if [ "${mem_limit}" != "" ]; then
 	cgcreate -g memory:/osprey
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgcreate -g memory:/osprey"
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo cgcreate -g memory:/osprey"
 	cgset -r memory.high="${mem_limit}M" osprey
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgset -r memory.high=${mem_limit}M osprey"
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo cgset -r memory.high=${mem_limit}M osprey"
 	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
 
@@ -142,26 +142,26 @@ mkdir -p ${playground_dir}
 pushd ${playground_dir}
 
 ${EXAMPLE_INPUT} ${workload} ${input_size} 1
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir}; ${EXAMPLE_INPUT} ${workload} ${input_size} 1"
 
-swapoff /dev/sdb2
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapoff /dev/sdb2"
+swapoff /dev/nvme0n1p2
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo swapoff /dev/nvme0n1p2"
 
 echo expected output is $(od -An -w -i ${workload}_${input_size}_0.expected | tail -n 2)
 
-mkswap /dev/sdb2
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo mkswap /dev/sdb2"
-swapon /dev/sdb2
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo swapon /dev/sdb2"
+mkswap /dev/nvme0n1p2
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo mkswap /dev/nvme0n1p2"
+swapon /dev/nvme0n1p2
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo swapon /dev/nvme0n1p2"
 
-echo ${tool_cmd} ${tool_args_garbler} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
-${tool_cmd} ${tool_args_garbler} ${SH2PC_UTILS} ${workload} ${input_size} 1 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}.garbler &
+echo ${tool_cmd} ${tool_args_garbler} ${EMP_UTILS}_garbler ${workload} ${input_size} 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
+${tool_cmd} ${tool_args_garbler} ${EMP_UTILS}_garbler ${workload} ${input_size} 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}.garbler &
 
 monitor_rss &
 
 sleep 1
-echo ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
-ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${SH2PC_UTILS} ${workload} ${input_size} 2 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output" | tee -a ${log_file}.evaluator
+echo ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${EMP_UTILS}_evaluator ${workload} ${input_size} 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${EMP_UTILS}_evaluator ${workload} ${input_size} 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output" | tee -a ${log_file}.evaluator
 
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 
@@ -169,7 +169,7 @@ popd
 
 if [ "${mem_limit}" != "" ]; then
 	cgdelete memory:/osprey
-	ssh -i /home/yicheng/.ssh/id_rsa yicheng@${other_ip} "fastsudo cgdelete memory:/osprey"
+	ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo cgdelete memory:/osprey"
 fi
 
 stty sane

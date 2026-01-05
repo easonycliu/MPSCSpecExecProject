@@ -58,6 +58,18 @@ void write_record(
 	to->write32(data3);
 }
 
+void write_record_32_with_width(mage::util::BinaryFileWriter* to, std::uint32_t key, std::size_t value_width) {
+	to->write32(key);
+
+	if (value_width == 0) {
+		return;
+	}
+
+	for (std::size_t i = 0; i < value_width; i++) {
+		to->write32(0);
+	}
+}
+
 void write256(
 	mage::util::BinaryFileWriter* to, std::uint64_t value0, std::uint64_t value1, std::uint64_t value2,
 	std::uint64_t value3
@@ -165,11 +177,11 @@ int main(int argc, char** argv) {
 				std::uint64_t cyclic_party = get_cyclic_worker(i, num_workers, input_size * 2);
 				std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size * 2);
 				if (i < input_size) {
-					write_record(garbler_writers[cyclic_party].get(), 2 * i);
+					write_record_32_with_width(garbler_writers[cyclic_party].get(), 2 * i, 15);
 				} else {
-					write_record(evaluator_writers[cyclic_party].get(), 2 * (2 * input_size - i - 1) + 1);
+					write_record_32_with_width(evaluator_writers[cyclic_party].get(), 2 * (2 * input_size - i - 1) + 1, 15);
 				}
-				write_record(expected_writers[blocked_party].get(), i);
+				write_record_32_with_width(expected_writers[blocked_party].get(), i, 15);
 			}
 		} else if (option == "random") {
 			std::vector<std::uint32_t> sorted(2 * input_size);
@@ -182,11 +194,11 @@ int main(int argc, char** argv) {
 				std::uint64_t cyclic_party = get_cyclic_worker(i, num_workers, input_size * 2);
 				std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size * 2);
 				if (i < input_size) {
-					write_record(garbler_writers[cyclic_party].get(), array[i]);
+					write_record_32_with_width(garbler_writers[cyclic_party].get(), array[i], 15);
 				} else {
-					write_record(evaluator_writers[cyclic_party].get(), array[i]);
+					write_record_32_with_width(evaluator_writers[cyclic_party].get(), array[i], 15);
 				}
-				write_record(expected_writers[blocked_party].get(), sorted[i]);
+				write_record_32_with_width(expected_writers[blocked_party].get(), sorted[i], 15);
 			}
 		} else {
 			std::cerr << "Unkown option " << option << std::endl;

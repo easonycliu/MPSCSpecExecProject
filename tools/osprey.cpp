@@ -59,10 +59,12 @@ struct OspreyConfig {
 	bool programmed_only;
 	bool program_from_parent;
 	std::string programming_algorithm;
+	std::string programming_backfile;
 	std::size_t mem_limit_low;
 	std::size_t mem_limit_high;
 	std::size_t mem_limit_max;
 	std::size_t batch_size;
+
 
 	bool no_overlay;
 	bool preserve_overlay_directories;
@@ -276,6 +278,11 @@ void launch_programmed_process(ProgrammedProcessInfo& programmed_info, OspreyCon
 			}
 		}
 
+		if (setenv("OSPREY_PROGRAMMING_BACKFILE", config.programming_backfile.c_str(), 1)) {
+			std::perror("setenv");
+			std::exit(EXIT_FAILURE);
+		}
+
 		/* Set up communication with parent. */
 		if (fcntl(osprey::lib::parent_comm_fd, F_GETFD) != -1 || errno != EBADF) {
 			std::cerr << "Fatal error: existing file descriptor conflicts with osprey::lib::parent_comm_fd"
@@ -398,6 +405,7 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
         ("trace-filebase", po::value<std::string>(&config.trace_filebase), "write access pattern trace to file at specified path")
         ("trace-to-stdout", po::bool_switch(&config.trace_to_stdout), "write trace in human-readable form to stdout")
         ("programming-algorithm", po::value<std::string>(&config.programming_algorithm)->default_value("3PO"))
+        ("programming-backfile", po::value<std::string>(&config.programming_backfile))
 		("mem-limit-low", po::value<std::size_t>(&config.mem_limit_low)->default_value(131072), "low memory limit for 3PO in kilobytes")
 		("mem-limit-high", po::value<std::size_t>(&config.mem_limit_high)->default_value(131072 * 3), "high memory limit for 3PO in kilobytes")
 		("mem-limit-max", po::value<std::size_t>(&config.mem_limit_max)->default_value(131072 * 4), "max memory limit for 3PO in kilobytes")
@@ -441,6 +449,10 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
 
 	if (config.trace_filebase.empty()) {
 		std::cout << "--trace-filebase is required" << std::endl;
+		return true;
+	}
+	if (config.programming_backfile.empty()) {
+		std::cout << "--programming-backfile is required" << std::endl;
 		return true;
 	}
 

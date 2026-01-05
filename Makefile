@@ -13,7 +13,7 @@ endif
 
 .PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ show fastsudo
 
-all: yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
+all: linux-headers yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
 
 mage: yaml-cpp tfhe oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
@@ -32,6 +32,11 @@ $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
 
 $(DEP_BUILD_DIR)/tools: $(DEP_BUILD_DIR)
 	mkdir $@ || true
+
+linux-headers: $(DEP_BUILD_DIR)
+	mkdir -p $(DEP_BUILD_DIR)/linux-headers || true
+	cd $(PROJECT_DIR)/linux && \
+		make headers_install INSTALL_HDR_PATH=$(DEP_BUILD_DIR)/linux-headers
 
 yaml-cpp: $(DEP_INSTALL_DIR)/yaml-cpp
 	cd $(PROJECT_DIR)/yaml-cpp && \
@@ -104,8 +109,11 @@ $(DEP_INSTALL_DIR)/oblivious-SEAL: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/oblivious
 $(DEP_BUILD_DIR)/oblivious-SEAL: $(DEP_BUILD_DIR)
 	mkdir $@ || true
 
-$(PROJECT_DIR)/osprey/bin/libosprey.so: $(DEP_INSTALL_DIR)
-	cd $(PROJECT_DIR)/osprey && make clean PROJECT_DIR=$(PROJECT_DIR) && make PROJECT_DIR=$(PROJECT_DIR) -j$(JOBS)
+osprey: $(PROJECT_DIR)/osprey/bin/libosprey.so
+
+$(PROJECT_DIR)/osprey/bin/libosprey.so: $(DEP_INSTALL_DIR) linux-headers
+	cd $(PROJECT_DIR)/osprey && make clean PROJECT_DIR=$(PROJECT_DIR) LINUX_HEADERS=$(DEP_BUILD_DIR)/linux-headers && \
+		make PROJECT_DIR=$(PROJECT_DIR) LINUX_HEADERS=$(DEP_BUILD_DIR)/linux-headers -j$(JOBS)
 
 $(DEP_INSTALL_DIR): $(DEP_BUILD_DIR)
 	mkdir $@ || true

@@ -578,7 +578,7 @@ public:
 								seal::Ciphertext temp;
 								evaluator.multiply(
 									input_data.first[row_a * matrix_size + batch_cols_a_rows_b + i],
-									input_data.second[(batch_cols_a_rows_b + i) * matrix_size + col_b], temp
+									input_data.second[col_b * matrix_size + batch_cols_a_rows_b + i], temp
 								);
 								evaluator.add_inplace(dot_product_result, temp);
 							}
@@ -749,7 +749,7 @@ int main(int argc, char** argv) {
 	std::size_t level;
 	std::unique_ptr<Problem> problem;
 	if (problem_name == "real_sum") {
-		level = 1;
+		level = 0;
 		problem = std::make_unique<Sum>();
 	} else if (problem_name == "real_statistics") {
 		level = 2;
@@ -765,7 +765,7 @@ int main(int argc, char** argv) {
 		problem = std::make_unique<MatrixMultiply>();
 	} else if (problem_name == "real_tiled_matrix_multiply") {
 		level = 1;
-		problem = std::make_unique<TiledMatrixMultiply<4>>();
+		problem = std::make_unique<TiledMatrixMultiply<16>>();
 	} else {
 		std::cerr << "Unknown problem name" << std::endl;
 		return 1;

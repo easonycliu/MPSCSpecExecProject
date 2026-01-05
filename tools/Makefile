@@ -20,7 +20,7 @@ endif
 all: $(TOOLS_EXECUTABLES)
 
 $(DEP_INSTALL_DIR)/tools/%: $(DEP_BUILD_DIR)/tools/%.o $(DEP_INSTALL_DIR)/tools
-	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp \
+	$(CXX) $< -pthread -laio -lssl -lcrypto -lboost_program_options -lboost_random -lboost_system -lgmp -luring \
 		-Wl,-rpath,$(PROJECT_DIR)/linux/tools/lib/bpf \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/yaml-cpp/lib \
 		-Wl,-rpath,$(DEP_INSTALL_DIR)/tfhe/lib \

@@ -620,7 +620,6 @@ int main(int argc, char** argv) {
 			} else {
 				evaluator_writers[blocked_party]->write32(2 * (2 * input_size - i - 1) + 1);
 			}
-			expected_writers[blocked_party]->write32(i);
 		}
 	} else if (problem_name == "tpc_h_q4") {
 		for (std::uint64_t i = 0; i != input_size; i++) {

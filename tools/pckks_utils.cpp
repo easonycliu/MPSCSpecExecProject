@@ -804,10 +804,16 @@ int main(int argc, char** argv) {
 	progress[2].first = "Decrypt";
 	progress[2].second = std::vector<std::atomic<bool>>(thread_num);
 	std::atomic<bool> calculate_start(false);
+
+	std::vector<std::vector<seal::Ciphertext>> encrypt_input_data_threads(thread_num);
+	for (std::size_t i = 0; i < thread_num; ++i) {
+		std::vector<seal::Ciphertext> & encrypt_input_data = encrypt_input_data_threads[i];
+		encrypt_file(std::get<0>(keypair), std::get<2>(keypair), divide_input_data[i].second, encrypt_input_data, level);
+	}
+
 	for (std::size_t i = 0; i < thread_num; ++i) {
 		std::thread([&, i]() {
-			std::vector<seal::Ciphertext> encrypt_input_data;
-			encrypt_file(std::get<0>(keypair), std::get<2>(keypair), divide_input_data[i].second, encrypt_input_data, level);
+			std::vector<seal::Ciphertext>& encrypt_input_data = encrypt_input_data_threads[i];
 			progress[0].second[i] = true;
 
 			while (!calculate_start.load()) {

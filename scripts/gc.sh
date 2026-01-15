@@ -29,7 +29,7 @@ log_file=/dev/null
 OSPREY=${project_dir}/install/tools/osprey
 EMP_UTILS=${project_dir}/install/tools/emp_utils
 PLANNER=${project_dir}/install/tools/planner
-EXAMPLE_INPUT=${project_dir}/install/tools/example_input
+EXAMPLE_INPUT=${project_dir}/build/emp-tool/example_input
 
 for flag in "$@"; do
 	case $flag in
@@ -154,14 +154,14 @@ ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo mkswap /dev
 swapon /dev/nvme0n1p2
 ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "fastsudo swapon /dev/nvme0n1p2"
 
-echo ${tool_cmd} ${tool_args_garbler} ${EMP_UTILS}_garbler ${workload} ${input_size} 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output
-${tool_cmd} ${tool_args_garbler} ${EMP_UTILS}_garbler ${workload} ${input_size} 1234 127.0.0.1 ${workload}_${input_size}_0_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}.garbler &
+echo ${tool_cmd} ${tool_args_garbler} ${EMP_UTILS}_garbler ${workload} ${input_size} 1234 127.0.0.1 ${workload}_${input_size}_garbler.input ${workload}_${input_size}_0_garbler.output
+${tool_cmd} ${tool_args_garbler} ${EMP_UTILS}_garbler ${workload} ${input_size} 1234 127.0.0.1 ${workload}_${input_size}_garbler.input ${workload}_${input_size}_0_garbler.output 2>&1 | tee -a ${log_file}.garbler &
 
 monitor_rss &
 
 sleep 1
-echo ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${EMP_UTILS}_evaluator ${workload} ${input_size} 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
-ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${EMP_UTILS}_evaluator ${workload} ${input_size} 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_0_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output" | tee -a ${log_file}.evaluator
+echo ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${EMP_UTILS}_evaluator ${workload} ${input_size} 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output"
+ssh -i /home/easonliu/.ssh/id_ed25519 easonliu@${other_ip} "cd ${playground_dir} && fastsudo ${tool_cmd} ${tool_args_evaluator} ${EMP_UTILS}_evaluator ${workload} ${input_size} 1234 ${this_ip} ${playground_dir}/${workload}_${input_size}_evaluator.input ${playground_dir}/${workload}_${input_size}_0_evaluator.output" | tee -a ${log_file}.evaluator
 
 echo real output is $(od -An -w -i ${workload}_${input_size}_0_garbler.output | tail -n 2)
 

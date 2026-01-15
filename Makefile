@@ -68,7 +68,7 @@ oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 		cmake --build $(DEP_BUILD_DIR)/oblivious-SEAL -j$(JOBS) && \
 		cmake --install $(DEP_BUILD_DIR)/oblivious-SEAL
 
-emp-tool: $(DEP_INSTALL_DIR)/tools osprey
+emp-tool: $(DEP_INSTALL_DIR)/tools $(DEP_BUILD_DIR)/emp-tool osprey
 	cd $(PROJECT_DIR)/emp-tool && \
 		cmake -B $(DEP_BUILD_DIR)/emp-tool -DOSPREY_SOURCE_DIR=$(PROJECT_DIR)/osprey && \
 		cmake --build $(DEP_BUILD_DIR)/emp-tool && \

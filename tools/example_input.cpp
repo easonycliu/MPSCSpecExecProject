@@ -612,6 +612,16 @@ int main(int argc, char** argv) {
 		} else {
 			std::cerr << "Unknown option " << option << std::endl;
 		}
+	} else if (problem_name == "pwd") {
+		for (std::uint64_t i = 0; i != input_size * 2; i++) {
+			std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size);
+			if (i < input_size) {
+				garbler_writers[blocked_party]->write32(2 * i);
+			} else {
+				evaluator_writers[blocked_party]->write32(2 * (2 * input_size - i - 1) + 1);
+			}
+			expected_writers[blocked_party]->write32(i);
+		}
 	} else if (problem_name == "tpc_h_q4") {
 		for (std::uint64_t i = 0; i != input_size; i++) {
 			std::uint64_t blocked_party = get_blocked_worker(i, num_workers, input_size);

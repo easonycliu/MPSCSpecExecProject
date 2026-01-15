@@ -108,7 +108,7 @@ fi
 rss_log_file=${log_dir}/${workload}_${input_size}.rss
 
 touch ${rss_log_file}
-echo "Timestamp,            RSS (MB)" > "$rss_log_file"
+echo "Timestamp,            RSS (MB),  CGROUP_MEM (MB)" > "$rss_log_file"
 
 monitor_rss() {
 	# Wait for the process to start
@@ -125,21 +125,22 @@ monitor_rss() {
 	# Start monitoring RSS
 	while kill -0 $PID 2>/dev/null; do
 		RSS=$(ps -o rss= -p $PID 2>/dev/null)
+		CGROUP_MEM=$(cat /sys/fs/cgroup/osprey/memory.current 2>/dev/null)
 		if [ -z "$RSS" ]; then
 			echo "Process $PID has terminated."
 			break
 		fi
 		TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
-		echo "$TIMESTAMP,  $(( RSS / 1024 ))" >> "$rss_log_file"
+		echo "$TIMESTAMP,  $(( RSS / 1024 )),      $(( CGROUP_MEM / (1024 * 1024) ))" >> "$rss_log_file"
 		sleep 1  # Adjust interval as needed
 	done
 }
 
+cgcreate -g memory:/osprey
 if [ "${mem_limit}" != "" -a "${tool}" != "mage" ]; then
-	cgcreate -g memory:/osprey
 	cgset -r memory.high="${mem_limit}M" osprey
-	tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 fi
+tool_cmd="cgexec -g memory:osprey ${tool_cmd}"
 
 if [ "${compile}" == "true" ]; then
 	pushd ${project_dir}
@@ -216,6 +217,4 @@ echo real output is $(od -An -t fD ${workload}_${input_size}_0_garbler.output | 
 
 popd
 
-if [ "${mem_limit}" != "" -a "${tool}" != "mage" ]; then
-	cgdelete memory:/osprey
-fi
+cgdelete memory:/osprey

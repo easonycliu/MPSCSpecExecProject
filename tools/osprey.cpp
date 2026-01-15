@@ -451,10 +451,10 @@ bool parse_osprey_args(OspreyConfig& config, int osprey_argc, char** osprey_argv
 		std::cout << "--trace-filebase is required" << std::endl;
 		return true;
 	}
-	if (config.programming_backfile.empty()) {
-		std::cout << "--programming-backfile is required" << std::endl;
-		return true;
-	}
+	// if (config.programming_backfile.empty()) {
+	// 	std::cout << "--programming-backfile is required" << std::endl;
+	// 	return true;
+	// }
 
 	if (config.tracing_algorithm != "MICROSET" && config.tracing_algorithm != "FIFO") {
 		std::cout << "Invalid value for --tracing-algorithm: must be MICROSET or FIFO" << std::endl;

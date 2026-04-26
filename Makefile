@@ -13,9 +13,9 @@ endif
 
 .PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ show fastsudo
 
-all: linux-headers yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
+all: linux-headers yaml-cpp oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
 
-mage: yaml-cpp tfhe oblivious-SEAL osprey
+mage: yaml-cpp oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
 		make clean PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage && \
 		make PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage -j$(JOBS) && \
@@ -24,7 +24,7 @@ mage: yaml-cpp tfhe oblivious-SEAL osprey
 $(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
 	mkdir $@ || true
 
-tools: $(DEP_INSTALL_DIR)/tools yaml-cpp tfhe osprey oblivious-SEAL mage emp-tool libOTe MP-SPDZ
+tools: $(DEP_INSTALL_DIR)/tools yaml-cpp osprey oblivious-SEAL mage emp-tool libOTe MP-SPDZ
 	make -C $(PROJECT_DIR)/tools -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)

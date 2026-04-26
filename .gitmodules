@@ -7,9 +7,6 @@
 [submodule "osprey"]
 	path = osprey
 	url = git@github.com:easonycliu/MPSCSpecExecOsprey.git
-[submodule "tfhe"]
-	path = tfhe
-	url = git@github.com:easonycliu/MPSCSpecExecTFHE.git
 [submodule "yaml-cpp"]
 	path = yaml-cpp
 	url = git@github.com:easonycliu/MPSCSpecExecYAMLCpp.git

@@ -9,14 +9,14 @@ Osprey solves this by running the target program **twice**:
 1. **Speculative pass** — the program runs against a memory-resident overlay while Osprey *traces* its page-access pattern using an eBPF page-fault tracer (`pftracer`) and a userfaultfd watcher.
 2. **Programmed pass** — the recorded trace is fed to a planner (the *3PO* algorithm) which produces an oblivious prefetch/eviction schedule. The program is then re-executed against that schedule, so DRAM is *programmed* rather than demand-paged. The observable I/O pattern depends only on the trace, not on private data.
 
-This repository is the umbrella build for Osprey and the third-party engines it has been integrated with, Microsoft SEAL (oblivious fork), EMP-toolkit, — together with end-to-end scripts that exercise CKKS, and garbled circuits under Osprey, MAGE, or a baseline.
+This repository is the umbrella build for Osprey and the two third-party engines it integrates with — Microsoft SEAL (oblivious fork) and EMP-toolkit — together with end-to-end scripts that exercise CKKS and garbled circuits under Osprey, MAGE, or a baseline.
 
 ## Repository layout
 
 | Path | Contents |
 | --- | --- |
 | `osprey/` | Core Osprey runtime: tracer, watcher, programmer, BPF page-fault tracer, overlay management. Builds `libosprey.so`. |
-| `tools/` | Workloads that wraps each backend (`ckks_utils`, `emp_utils`, `mage`, `example_input`, …). |
+| `tools/` | Workload drivers that wrap each backend (`ckks_utils`, `pckks_utils`, `mage`, `planner`, `example_input`). |
 | `linux/` | Custom Linux kernel source — used to install UAPI headers and build `libbpf` / `bpftool` against a known version. |
 | `mage/` | MAGE — the comparison oblivious-execution engine. |
 | `oblivious-SEAL/` | Microsoft SEAL fork with an oblivious-CKKS code path that links against Osprey. |
@@ -26,7 +26,7 @@ This repository is the umbrella build for Osprey and the third-party engines it 
 
 After a successful build:
 
-- `install/tools/` holds the user-facing executables (`osprey`, `mage`, `planner`, `ckks_utils`, `emp_utils`, `example_input`).
+- `install/tools/` holds the user-facing executables (`osprey`, `mage`, `planner`, `ckks_utils`, `pckks_utils`, `emp_utils_garbler`, `emp_utils_evaluator`, `example_input`).
 - `install/<dep>/` holds the installed headers/libraries of each third-party engine.
 - `build/` holds the per-component CMake/Make build trees.
 

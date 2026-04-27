@@ -11,7 +11,7 @@ ifndef JOBS
 JOBS := $(shell nproc)
 endif
 
-.PHONY: all clean install_deps tools tfhe oblivious-SEAL osprey mage emp-tool show fastsudo
+.PHONY: all clean install_deps tools oblivious-SEAL osprey mage emp-tool fastsudo
 
 all: linux-headers oblivious-SEAL osprey mage emp-tool tools
 
@@ -37,18 +37,6 @@ linux-headers: $(DEP_BUILD_DIR)
 	mkdir -p $(DEP_BUILD_DIR)/linux-headers || true
 	cd $(PROJECT_DIR)/linux && \
 		make headers_install INSTALL_HDR_PATH=$(DEP_BUILD_DIR)/linux-headers
-
-tfhe: $(DEP_INSTALL_DIR)/tfhe
-	cd $(PROJECT_DIR)/tfhe && \
-		cmake -S src -B $(DEP_BUILD_DIR)/tfhe -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ && \
-		cmake --build $(DEP_BUILD_DIR)/tfhe -j$(JOBS) && \
-		cmake --install $(DEP_BUILD_DIR)/tfhe
-
-$(DEP_INSTALL_DIR)/tfhe: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/tfhe
-	mkdir $@ || true
-
-$(DEP_BUILD_DIR)/tfhe: $(DEP_BUILD_DIR)
-	mkdir $@ || true
 
 oblivious-SEAL: $(DEP_INSTALL_DIR)/oblivious-SEAL
 	cd $(PROJECT_DIR)/oblivious-SEAL && \

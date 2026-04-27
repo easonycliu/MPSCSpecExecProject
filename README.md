@@ -116,14 +116,8 @@ Key options (see `osprey --help` for the full list):
 | `--speculative-only` / `--programmed-only` | Run only one pass instead of both. |
 | `--tracing-algorithm={MICROSET,FIFO}` | Working-set extraction algorithm (default `MICROSET`). |
 | `--window-size=N` | Tracer window size (default `2048`). |
-| `--programming-algorithm=3PO` | Oblivious schedule generator (default `3PO`). |
-| `--mem-limit-low / --mem-limit-high / --mem-limit-max` | 3PO memory budget in KiB. |
+| `--mem-limit-low / --mem-limit-high / --mem-limit-max` | Memory budget in KiB. |
 | `--batch-size=N` | Prefetch batch size (default `8192`). |
-| `--trace-to-stdout` | Print a human-readable trace to stdout. |
-| `--cleanup-only` | Remove leftover overlay directories and exit. |
-| `--preserve-overlay-directories` | Keep the per-pass overlays for inspection. |
-
-Memory budgets in the workload scripts are enforced with `cgexec -g memory:osprey`, so cgroup v2 with the `memory` controller must be available.
 
 ### Workload scripts
 
@@ -166,7 +160,3 @@ The script runs the workload **twice** under Osprey — once for the speculative
 In the second block, the number to look at is:
 
 - `Calculate time: <ms> milliseconds` — wall-clock for the CKKS kernel itself. This is *the* number to report for Osprey-on-CKKS performance.
-
-## License
-
-Osprey is distributed under the **GNU Lesser General Public License, version 3** — see `osprey/COPYING` and `osprey/COPYING.LESSER`. Vendored third-party components retain their own licenses; consult their respective subdirectories.

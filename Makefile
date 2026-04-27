@@ -11,11 +11,11 @@ ifndef JOBS
 JOBS := $(shell nproc)
 endif
 
-.PHONY: all clean install_deps tools yaml-cpp tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ show fastsudo
+.PHONY: all clean install_deps tools tfhe oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ show fastsudo
 
-all: linux-headers yaml-cpp oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
+all: linux-headers oblivious-SEAL osprey mage emp-tool libOTe MP-SPDZ tools
 
-mage: yaml-cpp oblivious-SEAL osprey
+mage: oblivious-SEAL osprey
 	cd $(PROJECT_DIR)/mage && \
 		make clean PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage && \
 		make PROJECT_DIR=$(PROJECT_DIR) BINDIR=$(DEP_INSTALL_DIR)/mage -j$(JOBS) && \
@@ -24,7 +24,7 @@ mage: yaml-cpp oblivious-SEAL osprey
 $(DEP_INSTALL_DIR)/mage: $(DEP_INSTALL_DIR)
 	mkdir $@ || true
 
-tools: $(DEP_INSTALL_DIR)/tools yaml-cpp osprey oblivious-SEAL mage emp-tool libOTe MP-SPDZ
+tools: $(DEP_INSTALL_DIR)/tools osprey oblivious-SEAL mage emp-tool libOTe MP-SPDZ
 	make -C $(PROJECT_DIR)/tools -j$(JOBS) PROJECT_DIR=$(PROJECT_DIR)
 
 $(DEP_INSTALL_DIR)/tools: $(DEP_INSTALL_DIR)
@@ -37,18 +37,6 @@ linux-headers: $(DEP_BUILD_DIR)
 	mkdir -p $(DEP_BUILD_DIR)/linux-headers || true
 	cd $(PROJECT_DIR)/linux && \
 		make headers_install INSTALL_HDR_PATH=$(DEP_BUILD_DIR)/linux-headers
-
-yaml-cpp: $(DEP_INSTALL_DIR)/yaml-cpp
-	cd $(PROJECT_DIR)/yaml-cpp && \
-		cmake -B $(DEP_BUILD_DIR)/yaml-cpp -DYAML_BUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$(DEP_INSTALL_DIR)/$@ && \
-		cmake --build $(DEP_BUILD_DIR)/yaml-cpp -j$(JOBS) && \
-		cmake --install $(DEP_BUILD_DIR)/yaml-cpp
-
-$(DEP_INSTALL_DIR)/yaml-cpp: $(DEP_INSTALL_DIR) $(DEP_BUILD_DIR)/yaml-cpp
-	mkdir $@ || true
-
-$(DEP_BUILD_DIR)/yaml-cpp: $(DEP_BUILD_DIR)
-	mkdir $@ || true
 
 tfhe: $(DEP_INSTALL_DIR)/tfhe
 	cd $(PROJECT_DIR)/tfhe && \
@@ -122,7 +110,7 @@ $(DEP_BUILD_DIR):
 	mkdir $@ || true
 
 install_deps: fastsudo
-	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev cgroup-tools binutils-dev libreadline-dev llvm libsodium-dev libgmp-dev
+	sudo apt install -y build-essential clang cmake libssl-dev libaio-dev cgroup-tools binutils-dev libreadline-dev llvm libsodium-dev libgmp-dev libyaml-cpp-dev
 	sudo apt install -y libboost-program-options-dev libboost-random-dev
 	cd $(PROJECT_DIR)/linux/tools/bpf/bpftool && make
 	cd $(PROJECT_DIR)/osprey && ./install_deps.sh --install-osprey-deps

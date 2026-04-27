@@ -20,7 +20,7 @@ This repository is the umbrella build for Osprey and the third-party engines it 
 | `linux/` | Custom Linux kernel source — used to install UAPI headers and build `libbpf` / `bpftool` against a known version. |
 | `mage/` | MAGE — the comparison oblivious-execution engine. |
 | `oblivious-SEAL/` | Microsoft SEAL fork with an oblivious-CKKS code path that links against Osprey. |
-| `yaml-cpp/`, `emp-tool/` | Third-party libraries vendored as build dependencies. |
+| `emp-tool/` | Third-party library vendored as a build dependency. |
 | `scripts/` | Top-level driver scripts: `ckks.sh`, `gc.sh`, `mpspdz.sh`, `senate.sh`, `mage.sh`. |
 | `Makefile` | Top-level orchestrator that builds every dependency in the right order and stages outputs into `build/` and `install/`. |
 
@@ -46,7 +46,7 @@ This target:
 
 1. Builds a small `fastsudo` helper used by some scripts.
 2. Installs the apt packages needed by Osprey and its backends:
-   `build-essential clang cmake libssl-dev libaio-dev cgroup-tools binutils-dev libreadline-dev llvm libsodium-dev libgmp-dev libboost-program-options-dev libboost-random-dev`.
+   `build-essential clang cmake libssl-dev libaio-dev cgroup-tools binutils-dev libreadline-dev llvm libsodium-dev libgmp-dev libyaml-cpp-dev libboost-program-options-dev libboost-random-dev`.
 3. Builds `bpftool` from the bundled `linux/tools/bpf/bpftool` tree.
 4. Runs `osprey/install_deps.sh --install-osprey-deps`.
 
@@ -62,7 +62,7 @@ If you prefer to drive these manually, `osprey/install_deps.sh` accepts:
 make all -j$(nproc)
 ```
 
-`all` builds, in order: `linux-headers`, `yaml-cpp`, `oblivious-SEAL`, `osprey` (`libosprey.so`), `mage`, `emp-tool`, `libOTe`, `MP-SPDZ`, and finally `tools`. Override the parallelism with `JOBS=…` if you need to.
+`all` builds, in order: `linux-headers`, `oblivious-SEAL`, `osprey` (`libosprey.so`), `mage`, `emp-tool`, `libOTe`, `MP-SPDZ`, and finally `tools`. Override the parallelism with `JOBS=…` if you need to.
 
 Useful sub-targets:
 
@@ -70,7 +70,7 @@ Useful sub-targets:
 | --- | --- |
 | `make osprey` | Just `osprey/bin/libosprey.so` and the Osprey driver. |
 | `make tools` | The workload drivers in `install/tools/` (depends on every backend). |
-| `make mage` / `make MP-SPDZ` / `make emp-tool` / `make libOTe` / `make oblivious-SEAL` / `make yaml-cpp` | A single backend. |
+| `make mage` / `make MP-SPDZ` / `make emp-tool` / `make libOTe` / `make oblivious-SEAL` | A single backend. |
 | `make linux-headers` | Stages kernel UAPI headers under `build/linux-headers`. |
 | `make clean` | Wipes `build/` and `install/` and runs `clean` in `osprey/`, `mage/`, and `MP-SPDZ/`. |
 

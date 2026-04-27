@@ -4,15 +4,12 @@ tool=
 tool_args=
 
 compile=
-compile_flags=
 
 input_size=
 mem_limit=
 workload=
 this_ip=
 other_ip=
-
-batch_size=1
 
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
@@ -28,7 +25,6 @@ log_file=/dev/null
 
 OSPREY=${project_dir}/install/tools/osprey
 EMP_UTILS=${project_dir}/install/tools/emp_utils
-PLANNER=${project_dir}/install/tools/planner
 EXAMPLE_INPUT=${project_dir}/build/emp-tool/example_input
 
 for flag in "$@"; do
@@ -42,10 +38,6 @@ for flag in "$@"; do
 			;;
 		--compile=*)
 			compile=$(echo $flag | awk -F = '{print $2}')
-			;;
-		--compile_flags=*)
-			value_index=$(( $(echo $flag | grep -bo = | awk -F : '{print $1}' | head -n 1) + 1 ))
-			compile_flags=$(echo ${flag:$value_index})
 			;;
 		--input_size=*)
 			input_size=$(echo $flag | awk -F = '{print $2}')
@@ -76,7 +68,6 @@ touch ${log_file}
 echo Tool: ${tool} | tee -a ${log_file}
 echo Tool args: ${tool_args} | tee -a ${log_file}
 echo Input size: ${input_size} | tee -a ${log_file}
-echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
 if [ "${tool}" == "osprey" ]; then

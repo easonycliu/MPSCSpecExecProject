@@ -9,8 +9,6 @@ workload=
 this_ip=
 other_ip=
 
-batch_size=1
-
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
 
@@ -66,7 +64,6 @@ touch ${log_file}
 echo Tool: ${tool} | tee -a ${log_file}
 echo Tool args: ${tool_args} | tee -a ${log_file}
 echo Input size: ${input_size} | tee -a ${log_file}
-echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 
 page_shift=17

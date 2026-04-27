@@ -34,7 +34,29 @@ After a successful build:
 
 Osprey targets Linux (developed on Ubuntu) and requires `clang`/`clang++` (C++20), `cmake`, GNU Make, Boost, and the cgroup tools. eBPF support requires a recent kernel with BTF.
 
-### 1. Install system dependencies
+### 1. Build and install the custom kernel
+
+The bundled `linux/` tree is a 5.15-based kernel patched for Osprey (it adds the BPF page-fault tracer hooks and the userfaultfd extensions Osprey relies on). You must boot into this kernel before building or running anything else.
+
+From `linux/`:
+
+```sh
+cp x86_64_config .config
+make olddefconfig
+make -j$(nproc)
+```
+
+Then install (`<dir>` is the directory where the sanitised UAPI headers will be staged):
+
+```sh
+sudo make headers_install INSTALL_HDR_PATH=<dir>
+sudo make modules_install
+sudo make install
+```
+
+Reboot into the resulting kernel — its `uname -r` ends in `-osprey` (set by `EXTRAVERSION` in `linux/Makefile`) — before continuing.
+
+### 2. Install system dependencies
 
 From the repository root:
 
@@ -56,7 +78,7 @@ If you prefer to drive these manually, `osprey/install_deps.sh` accepts:
 - `--install-utils` — `clang-format` and `libbenchmark-dev` for development.
 - `--set-vma-limit` — raises `vm.max_map_count` to `1048576` (recommended; Osprey creates many VMAs).
 
-### 2. Build everything
+### 3. Build everything
 
 ```sh
 make all -j$(nproc)
@@ -121,51 +143,29 @@ Common flags across the scripts:
 
 Script-specific options:
 
-- **`scripts/ckks.sh`** — homomorphic CKKS workloads (oblivious-SEAL). Adds `--round_num=N` and `--batch_size=N`.
+- **`scripts/ckks.sh`** — homomorphic CKKS workloads (oblivious-SEAL).
 - **`scripts/gc.sh`** — two-party garbled circuits (EMP-toolkit). Adds `--this_ip=` / `--other_ip=` for the garbler/evaluator hosts.
 - **`scripts/mage.sh`** — drives the same workloads under MAGE for comparison; also takes `--this_ip=` / `--other_ip=`.
 
 Per-run logs and an RSS time-series are written under `logs/<YYYYMMDD>/log_<timestamp>/`.
 
-#### Example: CKKS under Osprey
+#### Example: CKKS matrix-vector multiply under Osprey
 
 ```sh
-sudo ./scripts/ckks.sh \
+fastsudo ./scripts/ckks.sh \
     --tool=osprey \
-    --workload=matmul \
-    --input_size=4096 \
-    --round_num=1 \
-    --thread_num=1 \
-    --mem_limit=512 \
-    --tool_args="--mem-limit-high=393216 --mem-limit-max=524288"
+    --workload=matrix_vector_multiply \
+    --input_size=512 \
+    --tool_args='"--window-size=32768 --batch-size=131072 --mem-limit-low=251658240 --mem-limit-high=293601280 --mem-limit-max=335544320"'
 ```
 
-#### Example: garbled circuits across two hosts
+#### Reading the log
 
-Run on both the garbler and evaluator (with matching arguments):
+The script runs the workload **twice** under Osprey — once for the speculative pass (which only traces the memory-access pattern) and once for the programmed pass (the actual CKKS computation under the oblivious schedule). Both passes emit the same timing block, so every line below appears **twice** in the log; the **second** occurrence is the meaningful one.
 
-```sh
-sudo ./scripts/gc.sh \
-    --tool=osprey \
-    --workload=<circuit> \
-    --input_size=<n> \
-    --mem_limit=1024 \
-    --this_ip=10.0.0.1 --other_ip=10.0.0.2
-```
+In the second block, the number to look at is:
 
-### Running a custom program under Osprey
-
-Any program can be wrapped directly without using a script:
-
-```sh
-install/tools/osprey \
-    --trace-filebase=/tmp/myrun \
-    --mem-limit-high=393216 \
-    -- \
-    ./my_program arg1 arg2
-```
-
-The first invocation produces the trace files under `/tmp/myrun*`; the second pass consumes them and runs the program under the oblivious schedule. Pass `--speculative-only` to stop after tracing, or `--programmed-only` to re-use an existing trace.
+- `Calculate time: <ms> milliseconds` — wall-clock for the CKKS kernel itself. This is *the* number to report for Osprey-on-CKKS performance.
 
 ## License
 

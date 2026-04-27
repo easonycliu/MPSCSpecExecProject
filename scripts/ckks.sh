@@ -4,15 +4,11 @@ tool=
 tool_args=
 
 compile=
-compile_flags=
 
 input_size=
-round_num=1
 mem_limit=
 workload=
 thread_num=1
-
-batch_size=1
 
 current_time=$(date +%Y%m%d_%H%M%S)
 current_date=$(date +%Y%m%d)
@@ -41,15 +37,8 @@ for flag in "$@"; do
 		--compile=*)
 			compile=$(echo $flag | awk -F = '{print $2}')
 			;;
-		--compile_flags=*)
-			value_index=$(( $(echo $flag | grep -bo = | awk -F : '{print $1}' | head -n 1) + 1 ))
-			compile_flags=$(echo ${flag:$value_index})
-			;;
 		--input_size=*)
 			input_size=$(echo $flag | awk -F = '{print $2}')
-			;;
-		--round_num=*)
-			round_num=$(echo $flag | awk -F = '{print $2}')
 			;;
 		--mem_limit=*)
 			mem_limit=$(echo $flag | awk -F = '{print $2}')
@@ -72,7 +61,7 @@ problem_size=${input_size}
 if [ "${thread_num}" == "1" ]; then
 	target_name=ckks_utils
 	thread_num=
-	problem_size=${input_size}:${round_num}
+	problem_size=${input_size}:1
 fi
 CKKS_UTILS=${project_dir}/install/tools/${target_name}
 
@@ -84,7 +73,6 @@ touch ${log_file}
 echo Tool: ${tool} | tee -a ${log_file}
 echo Tool args: ${tool_args} | tee -a ${log_file}
 echo Input size: ${input_size} | tee -a ${log_file}
-echo Batch size: ${batch_size} | tee -a ${log_file}
 echo Memory limit: ${mem_limit}M | tee -a ${log_file}
 echo Thread number: ${thread_num} | tee -a ${log_file}
 
@@ -178,7 +166,7 @@ elif [ "${tool}" == "mage" ]; then
 	cat <<EOF >config.yaml
 page_shift: ${page_shift}
 num_pages: ${num_pages}
-round_num: ${round_num}
+round_num: 1
 prefetch_buffer_size: 16
 prefetch_lookahead: 100
 

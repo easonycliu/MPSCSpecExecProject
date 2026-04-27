@@ -12,4 +12,4 @@
 	url = git@github.com:easonycliu/MPSCSpecExecLinux.git
 [submodule "emp-tool"]
 	path = emp-tool
-	url = git@github.com:easonycliu/FastSMPCProject.git
+	url = git@github.com:easonycliu/MPSCSpecExecEMPTool.git

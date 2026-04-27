@@ -21,12 +21,12 @@ This repository is the umbrella build for Osprey and the third-party engines it 
 | `mage/` | MAGE — the comparison oblivious-execution engine. |
 | `oblivious-SEAL/` | Microsoft SEAL fork with an oblivious-CKKS code path that links against Osprey. |
 | `emp-tool/` | Third-party library vendored as a build dependency. |
-| `scripts/` | Top-level driver scripts: `ckks.sh`, `gc.sh`, `mpspdz.sh`, `senate.sh`, `mage.sh`. |
+| `scripts/` | Top-level driver scripts: `ckks.sh`, `gc.sh`, `mage.sh`. |
 | `Makefile` | Top-level orchestrator that builds every dependency in the right order and stages outputs into `build/` and `install/`. |
 
 After a successful build:
 
-- `install/tools/` holds the user-facing executables (`osprey`, `mage`, `planner`, `ckks_utils`, `mpspdz_utils`, `emp_utils`, `senate_utils`, `example_input`).
+- `install/tools/` holds the user-facing executables (`osprey`, `mage`, `planner`, `ckks_utils`, `emp_utils`, `example_input`).
 - `install/<dep>/` holds the installed headers/libraries of each third-party engine.
 - `build/` holds the per-component CMake/Make build trees.
 
@@ -62,7 +62,7 @@ If you prefer to drive these manually, `osprey/install_deps.sh` accepts:
 make all -j$(nproc)
 ```
 
-`all` builds, in order: `linux-headers`, `oblivious-SEAL`, `osprey` (`libosprey.so`), `mage`, `emp-tool`, `libOTe`, `MP-SPDZ`, and finally `tools`. Override the parallelism with `JOBS=…` if you need to.
+`all` builds, in order: `linux-headers`, `oblivious-SEAL`, `osprey` (`libosprey.so`), `mage`, `emp-tool`, and finally `tools`. Override the parallelism with `JOBS=…` if you need to.
 
 Useful sub-targets:
 
@@ -70,9 +70,9 @@ Useful sub-targets:
 | --- | --- |
 | `make osprey` | Just `osprey/bin/libosprey.so` and the Osprey driver. |
 | `make tools` | The workload drivers in `install/tools/` (depends on every backend). |
-| `make mage` / `make MP-SPDZ` / `make emp-tool` / `make libOTe` / `make oblivious-SEAL` | A single backend. |
+| `make mage` / `make emp-tool` / `make oblivious-SEAL` | A single backend. |
 | `make linux-headers` | Stages kernel UAPI headers under `build/linux-headers`. |
-| `make clean` | Wipes `build/` and `install/` and runs `clean` in `osprey/`, `mage/`, and `MP-SPDZ/`. |
+| `make clean` | Wipes `build/` and `install/` and runs `clean` in `osprey/` and `mage/`. |
 
 The Makefile uses `clang++` for the C++ toolchain. Builds are performed out-of-tree under `build/<component>/` and then installed into `install/<component>/`.
 
@@ -113,7 +113,7 @@ Common flags across the scripts:
 | --- | --- |
 | `--tool=osprey\|mage\|baseline` | Which runtime to drive the workload with. |
 | `--tool_args="…"` | Extra flags forwarded to `osprey` (e.g. `--mem-limit-high=…`). |
-| `--workload=NAME` | Workload identifier (depends on the script — e.g. CKKS kernel name, MPC circuit, TPC-H query). |
+| `--workload=NAME` | Workload identifier (depends on the script — e.g. CKKS kernel name or garbled-circuit name). |
 | `--input_size=N` | Problem size; semantics are workload-specific. |
 | `--mem_limit=M` | Memory cap in MiB enforced via cgroup. |
 | `--thread_num=N` | Worker count where supported. |
@@ -123,8 +123,6 @@ Script-specific options:
 
 - **`scripts/ckks.sh`** — homomorphic CKKS workloads (oblivious-SEAL). Adds `--round_num=N` and `--batch_size=N`.
 - **`scripts/gc.sh`** — two-party garbled circuits (EMP-toolkit). Adds `--this_ip=` / `--other_ip=` for the garbler/evaluator hosts.
-- **`scripts/mpspdz.sh`** — secret-sharing MPC via MP-SPDZ.
-- **`scripts/senate.sh`** — the Senate TPC-H benchmarks.
 - **`scripts/mage.sh`** — drives the same workloads under MAGE for comparison; also takes `--this_ip=` / `--other_ip=`.
 
 Per-run logs and an RSS time-series are written under `logs/<YYYYMMDD>/log_<timestamp>/`.
@@ -140,16 +138,6 @@ sudo ./scripts/ckks.sh \
     --thread_num=1 \
     --mem_limit=512 \
     --tool_args="--mem-limit-high=393216 --mem-limit-max=524288"
-```
-
-#### Example: MP-SPDZ baseline (no Osprey)
-
-```sh
-sudo ./scripts/mpspdz.sh \
-    --tool=baseline \
-    --workload=<circuit> \
-    --input_size=<n> \
-    --mem_limit=1024
 ```
 
 #### Example: garbled circuits across two hosts

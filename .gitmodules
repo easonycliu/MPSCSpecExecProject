@@ -13,9 +13,3 @@
 [submodule "emp-tool"]
 	path = emp-tool
 	url = git@github.com:easonycliu/FastSMPCProject.git
-[submodule "MP-SPDZ"]
-	path = MP-SPDZ
-	url = git@github.com:easonycliu/MPSCSpecExecMPSPDZ.git
-[submodule "libOTe"]
-	path = libOTe
-	url = git@github.com:easonycliu/MPSCSpecExecLibOTe.git
